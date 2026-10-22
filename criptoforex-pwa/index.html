@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16181d">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Локальный учебный терминал CriptoForex для iPhone.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CriptoForex">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<title>CriptoForex</title>
+<script>
+  if (window.navigator.standalone || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)) {
+    document.documentElement.classList.add("pwa-standalone");
+  }
+</script>
+<link rel="stylesheet" href="./style.css?v=113-pwa">
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== ТОРГОВЛЯ ===== -->
+  <section id="page-trade" class="page active">
+    <header class="top">
+      <button class="icon-btn" id="btn-open-trades" aria-label="Сделки">💼<span class="badge" id="open-badge" hidden>0</span></button>
+      <div class="balance">Баланс: <b id="balance" class="tap">$0</b><button class="plus" id="btn-topup" aria-label="Пополнить демо-счёт">+</button></div>
+      <span class="icon-btn spacer"></span>
+    </header>
+
+    <div class="tabs" id="asset-tabs"></div>
+
+    <div class="quote">
+      <div class="quote-main">
+        <span id="q-icon"></span>
+        <div>
+          <div class="price" id="price">—</div>
+          <div class="change" id="change"></div>
+        </div>
+      </div>
+      <div class="quote-r"><div class="ex-row"><button class="ex-pill ex-prev" id="ex-prev" title="Предыдущая биржа" hidden></button><button class="ex-pill" id="ex-pill" hidden>Авто ⌄</button></div>
+      <div class="sim-badge" id="sim-badge" hidden title="Нет связи с биржей — цены учебные">⚠ учебные цены</div></div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-tools">
+        <button class="round" id="btn-indicators" title="Индикаторы">〰️</button>
+        <button class="round" id="btn-alerts" title="Уведомления">🔔<span class="badge" id="alert-badge" hidden>0</span></button>
+        <button class="round tpsl-btn" id="btn-tpsl" title="Тейк-профит и стоп-лосс">TP<br>SL</button>
+        <button class="round" id="btn-tf" title="Таймфрейм">5 м</button>
+        <button class="round dom-btn" id="btn-dom" title="Стакан и заявки" hidden>DOM</button>
+        <button class="round" id="btn-trend" title="Поставить линию тренда" hidden>📐</button>
+        <button class="round" id="btn-undo-trend" title="Удалить последнюю линию тренда" hidden>↶</button>
+      </div>
+      <div id="lw-chart"></div>
+      <svg id="trend-svg"></svg>
+      <svg id="tpsl-svg"></svg>
+      <div id="place-ov" hidden></div>
+      <canvas id="mag" hidden></canvas>
+      <div id="tv-chart" hidden></div>
+    </div>
+
+    <footer class="trade-bar">
+      <div class="stake-row">
+        <button class="step" id="stake-minus">−</button>
+        <div class="stake-wrap" id="stake-wrap"><div class="drum" id="stake-drum" aria-hidden="true"></div>
+          <input id="stake" type="text" inputmode="decimal" value="1.00" aria-label="Сумма ставки"></div>
+        <button class="step" id="stake-plus">+</button>
+        <button class="lev" id="lev-btn" aria-label="Плечо">×100</button>
+      </div>
+      <div class="dir-row" id="dir-row">
+        <button class="dir down" id="btn-down"><span class="ico">↘</span>Вниз</button>
+        <button class="dir up" id="btn-up"><span class="ico">↗</span>Вверх</button>
+      </div>
+      <div class="pos-row" id="pos-row" hidden>
+        <div class="pos-info">
+          <div class="pos-name" id="pos-name"></div>
+          <div class="pos-time" id="pos-time"></div>
+        </div>
+        <div class="pos-pnl" id="pos-pnl"></div>
+        <button class="stop" id="btn-stop">СТОП</button>
+      </div>
+    </footer>
+  </section>
+
+  <!-- ===== ОБУЧЕНИЕ ===== -->
+  <section id="page-learn" class="page">
+    <h1>Обучение</h1>
+    <button class="card link" id="btn-tour"><b>🧭 Пройти обучение по навигации</b><div class="muted">Короткий тур по приложению — заново</div></button>
+    <div class="list" id="lessons"></div>
+  </section>
+
+  <!-- ===== АНАЛИТИКА ===== -->
+  <section id="page-analytics" class="page">
+    <div class="an-head"><h1>Аналитика</h1><button id="an-refresh" class="an-ref" aria-label="Обновить" title="Обновить">⟳</button></div>
+    <h2 id="an-asset"></h2>
+    <div class="widget-box" id="tv-technical"></div>
+    <h2>Календарь событий</h2>
+    <div class="widget-box tall" id="tv-events"></div>
+  </section>
+
+  <!-- ===== ПРОФИЛЬ ===== -->
+  <section id="page-profile" class="page">
+    <h1>Профиль</h1>
+    <div class="card"><div class="muted">Ваш баланс</div><div class="big green tap" id="p-balance">$0</div>
+      <button class="plus big-plus" id="btn-topup2">+</button></div>
+    <button class="card link" id="btn-stats"><b>Статистика</b><div class="muted">Статистика по валютным парам</div></button>
+    <div class="menu">
+      <button id="m-admin" hidden><span>🛡</span>Админка<i>›</i></button>
+      <button id="m-history"><span>💼</span>История<i>›</i></button>
+      <button id="m-settings"><span>⚙️</span>Настройки<i>›</i></button>
+      <button id="m-feedback"><span>💬</span>Написать @e3to_ya<i>›</i></button>
+    </div>
+    <div class="version">CriptoForex (v113)</div>
+  </section>
+
+  <nav class="nav">
+    <i class="nav-glass" aria-hidden="true"></i>
+    <button data-page="trade" class="active"><span>📊</span>Торговля</button>
+    <button data-page="learn"><span>🎓</span>Обучение</button>
+    <button data-page="analytics"><span>📈</span>Аналитика</button>
+    <button data-page="profile"><span>👤</span>Профиль</button>
+  </nav>
+</div>
+
+<!-- Экран «Сделки» -->
+<div id="trades-view" hidden>
+  <header class="tr-top"><button id="tr-back" aria-label="Назад">‹</button><h2>Сделки</h2><span></span></header>
+  <div class="chips tr-chips" id="tr-chips"></div>
+  <div id="tr-list"></div>
+  <footer class="tr-total"><div>Общая прибыль (<span id="tr-count">0</span>)</div><div id="tr-sum" class="tr-sum">$0</div></footer>
+</div>
+
+<!-- Экран «Админка» (виден только админам) -->
+<div id="admin-view" hidden>
+  <header class="tr-top"><button id="ad-back" aria-label="Назад">‹</button><h2>Админка</h2><button id="ad-refresh" class="ad-ref" aria-label="Обновить">⟳</button></header>
+  <div class="ad-sum" id="ad-sum"></div>
+  <div class="chips tr-chips" id="ad-tabs"></div>
+  <div class="ad-tools" id="ad-tools">
+    <div class="ad-search"><input id="ad-q" placeholder="Поиск: ник, имя или id" autocomplete="off" enterkeyhint="search"></div>
+    <div class="chips ad-sorts" id="ad-sorts"></div>
+  </div>
+  <div id="ad-list"></div>
+</div>
+
+<!-- Стакан и заявки (виден только админам) -->
+<div id="dom-view" hidden>
+  <div class="dom-split v2" id="dom-split2" title="Потяни, чтобы изменить ширину правой панели"></div>
+  <header class="dom-top">
+    <button id="dom-back" aria-label="Назад">‹</button>
+    <div class="dom-title"><b id="dom-title">Стакан</b><small id="dom-sub"></small></div>
+    <button id="dom-ex" class="dom-ex" aria-label="Биржа"></button>
+  </header>
+  <div class="dom-bar" id="dom-bar">
+    <button class="step" id="dom-minus" aria-label="Меньше">−</button>
+    <input id="dom-stake" type="text" inputmode="decimal" value="1.00" aria-label="Ставка">
+    <button class="step" id="dom-plus" aria-label="Больше">+</button>
+    <button class="lev" id="dom-lev" aria-label="Плечо">×100</button>
+    <label class="dom-tap" id="dom-tpsl-lab" title="Тейк-профит и стоп-лосс на новые заявки из стакана"><span>TP/SL</span><input type="checkbox" id="dom-tpsl" class="spot-in"><span class="spot-sw"></span></label>
+    <button class="step" id="dom-tpsl-set" aria-label="Настроить TP/SL" title="Настроить TP/SL">⚙</button>
+    <label class="dom-tap" title="Заявка уходит сразу по тапу на уровень"><span>1 тап</span><input type="checkbox" id="dom-tap" class="spot-in"><span class="spot-sw"></span></label>
+  </div>
+  <div class="dom-pos" id="dom-pos" hidden></div>
+  <div class="dom-lw">
+    <div class="dom-chartbox" id="dom-chartbox">
+      <canvas id="dom-chart"></canvas>
+      <div class="dom-tfs" id="dom-tfs"><button data-cd>Свечи</button><button data-tf="15s">15с</button><button data-tf="1">1м</button><button data-tf="5">5м</button></div>
+    </div>
+    <div class="dom-split" id="dom-split1" title="Потяни, чтобы изменить ширину графика и стакана"></div>
+    <div class="dom-ladder" id="dom-ladder"></div>
+    <div class="dom-zoom" id="dom-zoom">
+      <div class="zg"><button id="dom-rm" aria-label="Строки ниже" title="Строки стакана ниже">↕−</button><button id="dom-rp" aria-label="Строки выше" title="Строки стакана выше">↕+</button><small>строки</small></div>
+      <div class="zg"><button id="dom-zm" aria-label="Мельче шаг цены" title="Мельче шаг цены (×1 — каждый тик)">−</button><button id="dom-zv" aria-label="Сбросить" title="Шаг цены ×1">×1</button><button id="dom-zp" aria-label="Крупнее шаг цены" title="Крупнее шаг цены (×10 — каждый 10-й тик)">+</button><small>шаг цены</small></div>
+      <div class="zg"><button id="dom-ctr" aria-label="К текущей цене" title="К текущей цене">◎</button><small>к цене</small></div>
+    </div>
+    <div class="dom-plate" id="dom-plate"></div>
+  </div>
+  <div class="dom-confirm" id="dom-confirm" hidden></div>
+  <div class="dom-orders" id="dom-orders" hidden></div>
+  <footer class="dom-foot" id="dom-foot">
+    <button class="dir down" id="dom-down"><span class="ico">↘</span>Вниз</button>
+    <button class="dir up" id="dom-up"><span class="ico">↗</span>Вверх</button>
+  </footer>
+</div>
+
+<!-- Нижняя шторка (общая для всех списков) -->
+<div id="sheet-back" hidden></div>
+<div id="sheet" hidden>
+  <div class="grab"></div>
+  <h3 id="sheet-title"></h3>
+  <div id="sheet-body"></div>
+</div>
+<div id="toast" hidden></div>
+
+<script src="./currencies.js"></script>
+<script src="./icons.js?v=11"></script>
+<script src="./demo.js"></script>
+<script src="./app.js?v=113-pwa"></script>
+<script src="./dom.js?v=115"></script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+  }
+</script>
+</body>
+</html>
