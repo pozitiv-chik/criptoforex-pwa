@@ -493,13 +493,14 @@ async function domTrades() {
     let added = false;
     d.trades.forEach((r) => { if (!DOM.tSeen.has(r[0])) { DOM.tSeen.add(r[0]); DOM.trades.push(r); added = true; } });
     if (added && d.ver !== DOM.tVer) DOM.trades.sort((p, q) => p[1] - q[1]);       // история пришла целиком (в т.ч. задним числом) — упорядочить
+    DOM.tFail = 0;
     DOM.tVer = d.ver != null ? d.ver : DOM.tVer;
     if (d.trades.length) DOM.tSince = d.trades[d.trades.length - 1][1] - 3000;      // небольшой нахлёст, дубли отсекает tSeen
     const cut = Date.now() - 20 * 60 * 1000;
     if (DOM.trades.length > 24000 || (DOM.trades[0] && DOM.trades[0][1] < cut)) {
       DOM.trades = DOM.trades.filter((r) => r[1] >= cut).slice(-24000); DOM.tSeen = new Set(DOM.trades.map((r) => r[0]));
     }
-  } catch (e) { /* лента моргнула — повторим на следующем тике */ }
+  } catch (e) { DOM.tFail = (DOM.tFail || 0) + 1; /* лента моргнула — повторим на следующем тике; при долгом молчании покажем причину на графике */ }
   finally { DOM.tBusy = false; }
 }
 async function domCandles(force) {
@@ -617,7 +618,7 @@ function domChartDraw() {
     if (t.tp != null) hline(t.tp, green, "TP", [6, 4]);
     if (t.sl != null) hline(t.sl, red, "SL", [6, 4]);
   });
-  if (!DOM.trades.length && DOM.tOk) { ctx.fillStyle = muted; ctx.font = "13px system-ui,sans-serif"; ctx.fillText("Жду сделки…", 14, 64); }
+  if (!DOM.trades.length && DOM.tOk) { ctx.fillStyle = muted; ctx.font = "13px system-ui,sans-serif"; ctx.fillText((DOM.tFail || 0) >= 3 ? "Лента сделок Binance недоступна (сеть или блокировка) — пузыри появятся, когда связь восстановится" : "Жду сделки…", 14, 64); }
   if (!DOM.tOk && !DOM.candlesOn) { ctx.fillStyle = muted; ctx.font = "13px system-ui,sans-serif"; ctx.fillText("У этой биржи нет ленты сделок — включи «Свечи»", 14, 64); }
   const tf = $("dom-tfs"); tf.querySelectorAll("[data-tf]").forEach((x) => x.classList.toggle("on", DOM.candlesOn && x.dataset.tf === DOM.tf));
   tf.querySelector("[data-cd]").classList.toggle("on", DOM.candlesOn);

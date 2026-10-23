@@ -1,12 +1,31 @@
 /* Forex Игра — Mini App (чистый JS, без сборки). */
 "use strict";
 const tg = window.Telegram && Telegram.WebApp;
+// IN_TG — внутри Telegram Mini App; в обычном браузере (ПК, ноутбук, PWA) Telegram-настройки и упоминания скрываются
+const IN_TG = !!tg;
+// тактильный отклик имеет смысл только в Telegram или на устройстве с вибромотором и сенсорным экраном (не на ПК/ноутбуке с мышью)
+const IS_IOS = (() => { try { return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); } catch (e) { return false; } })();
+const HAS_HAPTIC = IN_TG || IS_IOS || (() => { try { return !!navigator.vibrate && (window.matchMedia("(pointer:coarse)").matches || navigator.maxTouchPoints > 0); } catch (e) { return false; } })();
+// iPhone: у Safari нет navigator.vibrate, но переключатель <input switch> (iOS 17.4+) даёт системный тактильный отклик — дёргаем его программно
+let iosHapEl = null;
+function iosHaptic() {
+  try {
+    if (!iosHapEl) {
+      iosHapEl = document.createElement("label");
+      iosHapEl.setAttribute("aria-hidden", "true");
+      iosHapEl.style.cssText = "position:fixed;left:-100px;top:-100px;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden";
+      const i = document.createElement("input"); i.type = "checkbox"; i.setAttribute("switch", ""); i.tabIndex = -1; iosHapEl.appendChild(i);
+      document.body.appendChild(iosHapEl);
+    }
+    iosHapEl.click();
+  } catch (e) {}
+}
 const LOCAL_DEMO = (() => {
   try { return !!(window.LocalDemo && LocalDemo.enabled && LocalDemo.enabled()); }
   catch (e) { return false; }
 })();
 // ---- тактильный отклик: единая точка для всей вибрации; отключается галочкой в Настройках
-const hapOn = () => { try { if (typeof S !== "undefined" && S && S.haptic !== undefined) return S.haptic !== false; return localStorage.getItem("haptic") !== "0"; } catch (e) { return true; } };
+const hapOn = () => { if (!HAS_HAPTIC) return false; try { if (typeof S !== "undefined" && S && S.haptic !== undefined) return S.haptic !== false; return localStorage.getItem("haptic") !== "0"; } catch (e) { return true; } };
 const hapLast = {};
 // kind: sel (тик) | light | medium | heavy | rigid | soft | ok | warn | err; force — мимо ограничения частоты (для «щелчков» ползунка)
 function hap(kind, force) {
@@ -22,6 +41,8 @@ function hap(kind, force) {
       else if (kind === "warn") h.notificationOccurred("warning");
       else if (kind === "err") h.notificationOccurred("error");
       else h.impactOccurred(kind);
+    } else if (IS_IOS) {
+      iosHaptic(); if (kind === "ok" || kind === "warn" || kind === "err" || kind === "heavy") setTimeout(iosHaptic, 70);
     } else if (navigator.vibrate) {
       navigator.vibrate({ sel: 5, soft: 8, light: 12, medium: 20, rigid: 24, heavy: 32, ok: [14, 40, 14], warn: [20, 50, 20], err: [30, 40, 30, 40, 30] }[kind] || 12);
     }
@@ -251,12 +272,24 @@ let FX_RGB = "150,205,255";   // цвет искр нижнего бара (r,g,
 const THEMES = {
   default: { name: "Стандартная", dark: true, v: { bg: "#16181d", card: "#1f2227", card2: "#272b32", line: "#2e3239", text: "#ffffff", muted: "#8b9099",
     sheet: "#22252b", pop: "#2b2f36", border2: "#555555", inv: "#ffffff", invT: "#000000", toast: "#333333", toastT: "#ffffff" } },
-  telegram: { name: "Как в Telegram", auto: true },
+  midnight: { name: "Полночь (синяя)", dark: true, v: { bg: "#0d1526", card: "#14203a", card2: "#1a2848", line: "#243659", text: "#eaf1ff", muted: "#8296b8",
+    sheet: "#111c33", pop: "#1a2848", border2: "#35508a", inv: "#ffffff", invT: "#0d1526", toast: "#243659", toastT: "#ffffff" } },
+  graphite: { name: "Графит", dark: true, v: { bg: "#202124", card: "#2a2b2f", card2: "#34363b", line: "#44464c", text: "#f1f3f4", muted: "#9aa0a6",
+    sheet: "#27282c", pop: "#34363b", border2: "#5f6368", inv: "#ffffff", invT: "#202124", toast: "#44464c", toastT: "#ffffff" } },
+  emerald: { name: "Изумруд", dark: true, v: { bg: "#0b1a16", card: "#12291f", card2: "#183629", line: "#21493a", text: "#e8fff4", muted: "#7fa896",
+    sheet: "#0f211b", pop: "#183629", border2: "#2f6a53", inv: "#ffffff", invT: "#0b1a16", toast: "#21493a", toastT: "#ffffff" } },
+  violet: { name: "Фиолет", dark: true, v: { bg: "#17102a", card: "#221842", card2: "#2c2058", line: "#3d2f73", text: "#f3edff", muted: "#a395cc",
+    sheet: "#1d1536", pop: "#2c2058", border2: "#5b48a3", inv: "#ffffff", invT: "#17102a", toast: "#3d2f73", toastT: "#ffffff" } },
+  sand: { name: "Светлая (песок)", dark: false, v: { bg: "#f6f1e7", card: "#ebe4d4", card2: "#e0d7c2", line: "#d3c9b0", text: "#2b2418", muted: "#7d735d",
+    sheet: "#f6f1e7", pop: "#ebe4d4", border2: "#b8ac8e", inv: "#2b2418", invT: "#f6f1e7", toast: "#2b2418", toastT: "#ffffff" } },
+  light: { name: "Светлая", dark: false, v: { bg: "#f4f6fa", card: "#e8ecf3", card2: "#dce2ec", line: "#cfd6e2", text: "#12161f", muted: "#6b7280",
+    sheet: "#ffffff", pop: "#e8ecf3", border2: "#b6bfce", inv: "#12161f", invT: "#ffffff", toast: "#222222", toastT: "#ffffff" } },
+  telegram: { name: "Как в Telegram", auto: true, tgOnly: true },
   custom: { name: "Свой цвет", custom: true },
   tgnight: { name: "Telegram Night", dark: true, v: { bg: "#17212b", card: "#1e2a38", card2: "#242f3d", line: "#2b3a4a", text: "#f5f5f5", muted: "#7f91a4",
-    sheet: "#1c2733", pop: "#242f3d", border2: "#3c4f63", inv: "#ffffff", invT: "#17212b", toast: "#2b3a4a", toastT: "#ffffff" }, acc: "#5288c1" },
+    sheet: "#1c2733", pop: "#242f3d", border2: "#3c4f63", inv: "#ffffff", invT: "#17212b", toast: "#2b3a4a", toastT: "#ffffff" }, acc: "#5288c1", tgOnly: true },
   tgday: { name: "Telegram Day", dark: false, v: { bg: "#ffffff", card: "#f1f3f5", card2: "#e6e9ed", line: "#dfe3e8", text: "#0f1419", muted: "#707579",
-    sheet: "#ffffff", pop: "#f1f3f5", border2: "#c4c9cf", inv: "#0f1419", invT: "#ffffff", toast: "#222222", toastT: "#ffffff" }, acc: "#3390ec" },
+    sheet: "#ffffff", pop: "#f1f3f5", border2: "#c4c9cf", inv: "#0f1419", invT: "#ffffff", toast: "#222222", toastT: "#ffffff" }, acc: "#3390ec", tgOnly: true },
   amoled: { name: "Чёрная (AMOLED)", dark: true, v: { bg: "#000000", card: "#0e0e0e", card2: "#161616", line: "#222222", text: "#ffffff", muted: "#7d838c",
     sheet: "#0b0b0b", pop: "#151515", border2: "#3a3a3a", inv: "#ffffff", invT: "#000000", toast: "#222222", toastT: "#ffffff" } },
 };
@@ -1469,6 +1502,8 @@ function openLeverage() {
 
 // ---------------------------------------------------------------- шторки
 let sheetTimer = null;
+// в APK тут синхронизировался цвет нативной статус-бара; в PWA/браузере делать нечего (без этой заглушки шторки падали с ReferenceError и список бирж не рисовался)
+function syncNativeStatusBar() {}
 const sheetMobile = () => { const g = document.querySelector("#sheet .grab"); return !!g && getComputedStyle(g).display !== "none"; };   // шторка снизу (на ПК — окно по центру)
 function openSheet(title, html) {
   const sh = $("sheet"), bk = $("sheet-back"), wasOpen = !sh.hidden;
@@ -1702,13 +1737,13 @@ function openSettings() {
     <div class="row tap" id="set-theme"><div class="grow">Тема оформления<div class="sub">${esc(THEMES[S.theme].name)} · нажми, чтобы изменить</div></div><span class="muted">›</span></div>
     <div class="row tap" id="set-cur"><div class="grow">Валюта баланса<div class="sub">${esc(S.currency)} · нажми, чтобы изменить</div></div><span class="muted">›</span></div>
     <label class="row tap set-sw"><div class="grow">Показывать подсказки<div class="sub">Знаки «?» рядом с кнопками</div></div><input type="checkbox" id="set-hints" class="spot-in" ${hintsOn() ? "checked" : ""}><span class="spot-sw"></span></label>
-    <label class="row tap set-sw"><div class="grow">Тактильный отклик<div class="sub">Вибрация при нажатиях, на ползунках и при перетаскивании</div></div><input type="checkbox" id="set-haptic" class="spot-in" ${hapOn() ? "checked" : ""}><span class="spot-sw"></span></label>
+    ${HAS_HAPTIC ? `<label class="row tap set-sw"><div class="grow">Тактильный отклик<div class="sub">Вибрация при нажатиях, на ползунках и при перетаскивании</div></div><input type="checkbox" id="set-haptic" class="spot-in" ${hapOn() ? "checked" : ""}><span class="spot-sw"></span></label>` : ""}
     ${S.isAdmin ? `<label class="row tap set-sw set-sub"><div class="grow">Подсказки арбитража<div class="sub">Из сигналов Ф+Ф и Ф+С: где купить («Вверх») и где продать («Вниз»)</div></div><input type="checkbox" id="set-arb" class="spot-in" ${S.arbHints !== false ? "checked" : ""}><span class="spot-sw"></span></label>` : ""}
-    <div class="row" style="flex-wrap:wrap"><div class="grow" style="flex-basis:100%">Режим окна<div class="sub">Компакт — низкое окно · Обычный — на весь рост · Весь экран — без шапки Telegram</div></div>
-      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">${[["compact", "Компакт"], ["full", "Обычный"], ["fs", "Весь экран"]].map(([k, t]) => `<button class="pill ${winMode() === k ? "on" : ""}" data-win="${k}">${t}</button>`).join("")}</div></div>
-    <label class="row tap set-sw"><div class="grow">Плавные анимации<div class="sub">Выключи, если телефон тормозит</div></div><input type="checkbox" id="set-anim" class="spot-in" ${S.anim !== false ? "checked" : ""}><span class="spot-sw"></span></label>`);
-  $("set-haptic").onchange = (e) => { S.haptic = e.target.checked; try { localStorage.setItem("haptic", S.haptic ? "1" : "0"); } catch (x) {} if (S.haptic) hap("medium", true); api("/api/ui", { haptic: S.haptic }).catch(() => {}); saveUi(); };
-  $("set-hints").onchange = (e) => { if (winBusy()) { e.target.checked = hintsOn(); return; } setHints(e.target.checked); };
+    ${IN_TG ? `<div class="row" style="flex-wrap:wrap"><div class="grow" style="flex-basis:100%">Режим окна<div class="sub">Компакт — низкое окно · Обычный — на весь рост · Весь экран — без шапки Telegram</div></div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">${[["compact", "Компакт"], ["full", "Обычный"], ["fs", "Весь экран"]].map(([k, t]) => `<button class="pill ${winMode() === k ? "on" : ""}" data-win="${k}">${t}</button>`).join("")}</div></div>` : ""}
+    <label class="row tap set-sw"><div class="grow">Плавные анимации<div class="sub">Выключи, если интерфейс тормозит</div></div><input type="checkbox" id="set-anim" class="spot-in" ${S.anim !== false ? "checked" : ""}><span class="spot-sw"></span></label>`);
+  if ($("set-haptic")) $("set-haptic").onchange = (e) => { S.haptic = e.target.checked; try { localStorage.setItem("haptic", S.haptic ? "1" : "0"); } catch (x) {} if (S.haptic) hap("medium", true); api("/api/ui", { haptic: S.haptic }).catch(() => {}); saveUi(); };
+  $("set-hints").onchange = (e) => { setHints(e.target.checked); };
   if ($("set-arb")) $("set-arb").onchange = (e) => { S.arbHints = e.target.checked; if (!S.arbHints) arbTipClose(); saveUi(); };
   $("set-anim").onchange = (e) => { if (winBusy()) { e.target.checked = S.anim !== false; return; } S.anim = e.target.checked; document.documentElement.classList.toggle("no-anim", !S.anim); saveUi(); };
   $("sheet-body").querySelectorAll("[data-win]").forEach((el) => (el.onclick = (e) => {
@@ -1726,7 +1761,7 @@ function openSettings() {
 function openThemes() {
   const sw = (id) => { const v = resolveTheme(id).v, bt = id === "custom" ? customColors().btn : v.muted; return `<span class="theme-sw"><i style="background:${v.bg}"></i><i style="background:${v.card}"></i><i style="background:${v.text}"></i><i style="background:${bt}"></i></span>`; };
   const cc = customColors();
-  openSheet("Тема оформления", Object.keys(THEMES).map((id) =>
+  openSheet("Тема оформления", Object.keys(THEMES).filter((id) => IN_TG || !THEMES[id].tgOnly).map((id) =>
     `<div class="row tap theme-row" data-th="${id}">${sw(id)}<div class="grow">${esc(THEMES[id].name)}${id === "default" ? '<div class="sub">по умолчанию</div>' : id === "telegram" ? '<div class="sub">цвета твоего Telegram</div>' : id === "custom" ? '<div class="sub">выбери фон и цвет кнопок</div>' : ""}</div>${S.theme === id ? '<span class="ck">✓</span>' : ""}</div>`).join("")
     + `<div class="theme-pick"><label>Фон<input type="color" id="cp-bg" value="${cc.bg}"><input type="text" id="cx-bg" class="hex-in" value="${cc.bg}" maxlength="7" autocapitalize="off" autocomplete="off" spellcheck="false" aria-label="Код цвета фона"></label><label>Кнопки<input type="color" id="cp-btn" value="${cc.btn}"><input type="text" id="cx-btn" class="hex-in" value="${cc.btn}" maxlength="7" autocapitalize="off" autocomplete="off" spellcheck="false" aria-label="Код цвета кнопок"></label></div>`);
   $("sheet-body").querySelectorAll("[data-th]").forEach((el) => (el.onclick = () => { applyTheme(el.dataset.th, true); saveUi(); openThemes(); }));
@@ -1756,8 +1791,7 @@ function openThemes() {
   });
 }
 function openFeedback() {
-  const url = S.cfg.feedback_url;
-  if (!url) return toast("Контакт для связи не задан (OWNER_ID / FEEDBACK_URL)");
+  const url = S.cfg.feedback_url || "https://t.me/e3to_ya";
   if (tg && tg.openTelegramLink && url.startsWith("https://t.me")) tg.openTelegramLink(url); else window.open(url, "_blank");
 }
 function topupText() {
@@ -1767,6 +1801,29 @@ function topupText() {
 // пополнение за звёзды Telegram: окно с описанием → оплата через родной счёт Telegram
 function topup() {
   const t = topupText();
+  if (!IN_TG) {   // вне Telegram звёзд нет — демо-счёт пополняется бесплатно на любую сумму в любой валюте
+    const opts = CURRENCIES.filter(([code]) => code === "USD" || S.rates[code]).map(([code, , name]) => `<option value="${code}" ${code === S.currency ? "selected" : ""}>${code} — ${esc(name)}</option>`).join("");
+    openSheet("Пополнить счёт", `<div style="padding:4px 4px 8px;line-height:1.5;text-align:center">Введи сумму пополнения демо-счёта.<br><span class="muted">Это учебные деньги, настоящих списаний нет.</span></div>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><input id="tp-amt" type="text" inputmode="decimal" autocomplete="off" placeholder="Сумма" value="${t.usd.replace(/[^\d]/g, "")}" style="flex:1 1 120px;min-width:0;padding:12px;border-radius:10px;border:1px solid var(--border2);background:var(--card2);color:var(--text);font-size:18px;font-weight:600">
+        <select id="tp-cur" style="flex:1 1 160px;min-width:0;padding:12px;border-radius:10px;border:1px solid var(--border2);background:var(--card2);color:var(--text);font-size:15px">${opts}</select></div>
+      <div class="hint" id="tp-hint"></div>
+      <button class="btn-green" id="pay-free">Пополнить</button>`);
+    const usdOf = () => {
+      const v = parseFloat($("tp-amt").value.replace(/\s/g, "").replace(",", ".")), c = $("tp-cur").value, r = c === "USD" ? 1 : S.rates[c];
+      return Number.isFinite(v) && v > 0 && r > 0 ? { v, c, usd: v / r } : null;
+    };
+    const upd = () => { const x = usdOf(); $("tp-hint").textContent = !x ? "Введи сумму больше нуля" : x.c === "USD" ? "" : "≈ " + money(x.usd).replace("$", "") + " $ по текущему курсу"; };
+    $("tp-amt").oninput = upd; $("tp-cur").onchange = upd; upd();
+    $("pay-free").onclick = async () => {
+      const x = usdOf(), b = $("pay-free");
+      if (!x) { toast("Введи сумму больше нуля"); return; }
+      if (x.usd > 100000000) { toast("Слишком большая сумма"); return; }
+      if (b.disabled) return; b.disabled = true;
+      try { const d = await api("/api/balance/topup", { amount: x.usd }); S.balance = d.balance; closeSheet(); toast("✅ Зачислено: +" + x.v.toLocaleString("ru-RU", { maximumFractionDigits: 2 }) + " " + x.c); tick(); }
+      catch (e) { b.disabled = false; toast(e.message); }
+    };
+    return;
+  }
   openSheet("Пополнить счёт", `<div style="text-align:center;padding:6px 8px 16px;line-height:1.5">
       Получи <b>${t.usd}</b> на демо-счёт<br>за <b>⭐ ${t.st}</b> звёзд Telegram.</div>
     <button class="btn-green" id="pay-stars">Оплатить ⭐ ${t.st}</button>`);
@@ -2529,7 +2586,7 @@ const HINTS = [
   { sel: "#btn-open-trades", text: "Сделки: открытые позиции и история. Значок показывает, сколько позиций открыто." },
   { sel: "#asset-tabs .tab.add", text: "Добавить актив во вкладки: форекс, металлы, крипто. Переключатель «Спот» в поиске добавит любую монету по тикеру. ✕ на вкладке убирает её." },
   { sel: "#btn-indicators", text: "Индикаторы на графике (скользящие средние, RSI и другие) помогают оценить, куда может пойти цена." },
-  { sel: "#btn-alerts", text: "Уведомление: бот напишет в Telegram, когда цена дойдёт до выбранного уровня." },
+  { sel: "#btn-alerts", text: IN_TG ? "Уведомление: бот напишет в Telegram, когда цена дойдёт до выбранного уровня." : "Уведомление: приложение покажет сообщение, когда цена дойдёт до выбранного уровня (пока оно открыто)." },
   { sel: "#btn-tpsl", text: "Тейк-профит закроет сделку в плюсе, стоп-лосс — в минусе, когда цена дойдёт до заданного уровня." },
   { sel: "#btn-tf", text: "Таймфрейм — сколько времени занимает одна свеча на графике (1 минута, 5 минут, час и т. д.)." },
   { sel: ".stake-row", pos: "tl", text: "Ставка — сколько $ ты вкладываешь в сделку. Меняй кнопками − / + или впиши сумму вручную." },
@@ -2602,7 +2659,12 @@ function hintsSync() {
   });
 }
 
-function setHints(on) { S.hints = !!on; saveUi(); hintsSync(); }
+function setHints(on) {
+  S.hints = !!on;
+  try { localStorage.setItem("hints", S.hints ? "1" : "0"); } catch (e) {}   // сразу на устройство: не ждём отложенного сохранения
+  document.documentElement.classList.toggle("no-hints", !S.hints);
+  saveUi(); hintsSync();
+}
 
 // ---------------------------------------------------------------- обучение по навигации (тур по приложению)
 // Показывается один раз каждому игроку (флаг tour_done хранится на сервере в его настройках ui — поэтому не повторяется
@@ -2740,6 +2802,8 @@ async function main() {
   S.currency = (S.ui.currency || "USD").toUpperCase();
   S.arbHints = S.ui.arb_hints !== false;                // подсказки арбитража (где купить/продать) — только админам, по умолчанию включены
   S.hints = S.ui.hints !== false;                       // подсказки «?» включены по умолчанию
+  try { const h = localStorage.getItem("hints"); if (h === "0" || h === "1") S.hints = h === "1"; } catch (e) {}   // то, что человек выбрал на этом устройстве, главнее
+  document.documentElement.classList.toggle("no-hints", !S.hints);
   let savedHaptic = null;
   try { const value = localStorage.getItem("haptic"); if (value === "0" || value === "1") savedHaptic = value === "1"; } catch (e) {}
   if (LOCAL_DEMO && savedHaptic !== null) S.haptic = savedHaptic;

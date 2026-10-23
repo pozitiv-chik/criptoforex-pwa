@@ -596,10 +596,20 @@
   async function marketTrades(url) {
     const assetId = url.searchParams.get("asset"), asset = assetById(assetId), source = asset && sourceList(asset, "binance")[0];
     if (!source || asset.cat !== "crypto") return { ex: "binance", ok: false, trades: [], ver: 0 };
-    const data = await getJson(queryUrl("https://api.binance.com/api/v3/trades", { symbol: source.symbol, limit: 500 }), 900);
+    // лента сделок: для фьючерса сначала фьючерсный Binance (тот же рынок, что и стакан), затем спот и зеркало данных; первый ответивший выигрывает
+    const urls = [];
+    if (asset.market !== "spot") urls.push(queryUrl("https://fapi.binance.com/fapi/v1/trades", { symbol: source.symbol, limit: 500 }));
+    urls.push(queryUrl("https://api.binance.com/api/v3/trades", { symbol: source.symbol, limit: 500 }));
+    urls.push(queryUrl("https://data-api.binance.vision/api/v3/trades", { symbol: source.symbol, limit: 500 }));
+    let data = null, lastError = null;
+    for (const u of urls) {
+      try { const d = await getJson(u, 900); if (Array.isArray(d)) { data = d; break; } }
+      catch (error) { lastError = error; }
+    }
+    if (!data) throw lastError || new Error("Лента сделок Binance недоступна");
     const since = Number(url.searchParams.get("since")) || 0;
-    const trades = (Array.isArray(data) ? data : []).map((row) => [Number(row.id), Number(row.time), Number(row.price), Number(row.qty), row.isBuyerMaker ? -1 : 1])
-      .filter((row) => !since || row[1] >= since).sort((a, b) => a[1] - b[1]);
+    const trades = data.map((row) => [Number(row.id), Number(row.time), Number(row.price), Number(row.qty), row.isBuyerMaker ? -1 : 1])
+      .filter((row) => Number.isFinite(row[1]) && Number.isFinite(row[2]) && Number.isFinite(row[3]) && (!since || row[1] >= since)).sort((a, b) => a[1] - b[1]);
     return { ex: "binance", ok: true, trades, ver: Date.now() };
   }
 
@@ -647,8 +657,11 @@
         return { by_asset: [...grouped.values()].map((row) => ({ ...row, pnl: round(row.pnl, 2) })).sort((a, b) => b.trades - a.trades) };
       }
       case "/api/balance/topup":
-        state.balance = round(state.balance + catalog.config.topup_amount); saveState();
-        return { balance: state.balance, amount: catalog.config.topup_amount };
+      {
+        const asked = Number(data.amount), amount = Number.isFinite(asked) && asked > 0 ? Math.min(asked, 1e8) : catalog.config.topup_amount;
+        state.balance = round(state.balance + amount, 2); saveState();
+        return { balance: state.balance, amount };
+      }
       case "/api/ui": {
         if (!body || typeof body !== "object" || Array.isArray(body) || JSON.stringify(body).length > 30000) fail("Некорректные настройки");
         const allowed = new Set(["tabs", "asset", "tf", "indicators", "favorites", "stake", "chart_cfg", "chart_mode", "theme", "currency", "leverage", "pre_levels", "tour_done", "hints", "arb_hints", "anim", "haptic", "theme_custom", "dom"]);

@@ -954,3 +954,6 @@ html.fs #dom-view{padding-top:var(--safe-t)}
 .dr.has-mk{box-shadow:inset 0 0 0 1px #f59e0b}
 
 .dom-ladder .dr.tapflash{box-shadow:inset 0 0 0 2px #f59e0b;}
+
+/* подсказки «?» выключены в настройках */
+.no-hints #hints,.no-hints #hint-pop,.no-hints .qm{display:none!important}
