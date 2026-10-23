@@ -1,0 +1,956 @@
+:root{
+  --bg:#16181d; --card:#1f2227; --card2:#272b32; --line:#2e3239;
+  --text:#fff; --muted:#8b9099; --green:#2e9e3a; --red:#e03500; --accent:#2e9e3a; --accent-t:#fff; --sel:#e03500; --round:rgba(110,110,110,.85); --round-t:#fff;
+  --sheet:#22252b; --pop:#2b2f36; --border2:#555; --inv:#fff; --inv-t:#000; --toast:#333; --toast-t:#fff;
+  --up:#2e9e3a; --down:#e03500; --up-t:#fff; --down-t:#fff;
+  --fx1:150,205,255; --fx2:60,150,255; --fx3:20,70,190; --fx-alt:255,155,45;   /* цвета нижнего бара и его эффектов (r,g,b); в теме «Свой цвет» — из выбранного цвета кнопок */
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:16px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+#app{display:flex;flex-direction:column;height:100%}
+.page{display:none;flex:1;min-height:0;overflow-y:auto;padding:0 16px 16px}
+.page.active{display:flex;flex-direction:column}
+#page-trade{padding:0}
+h1{text-align:center;font-size:22px;margin:14px 0}
+h2{font-size:16px;margin:16px 0 8px}
+.muted{color:var(--muted)} .green{color:var(--green)} .red{color:var(--red)}
+
+/* --- торговля --- */
+.top{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 6px}
+.icon-btn{width:36px;height:36px;font-size:22px;position:relative}
+.icon-btn.spacer{visibility:hidden}
+.badge{position:absolute;top:-2px;right:-2px;background:var(--red);border-radius:9px;font-size:11px;min-width:16px;height:16px;line-height:16px;text-align:center}
+.balance{font-size:20px;font-weight:600;position:relative}
+.plus{width:20px;height:20px;border-radius:50%;background:var(--accent);color:var(--accent-t);font-size:15px;line-height:20px;position:absolute;top:-6px;right:-26px;padding:0}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:6px 12px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;min-width:104px;padding:8px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);position:relative;text-align:center}
+.tab small{display:block;color:var(--muted);font-size:13px}
+.tab.active{border-color:var(--sel)}
+.tab.add{min-width:56px;font-size:26px;display:flex;align-items:center;justify-content:center}
+.tab .x{position:absolute;top:-6px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--border2);font-size:12px;line-height:18px}
+.tab .pnl{font-size:13px}
+.quote{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 16px 0}
+.price{font-size:15px;font-weight:600}
+.change{font-size:15px;margin-top:2px}
+.sim-badge{font-size:12px;color:#f5b301;border:1px solid #f5b301;border-radius:10px;padding:2px 8px}
+.chart-wrap{position:relative;flex:1;min-height:0}
+#tv-chart,#lw-chart{position:absolute;inset:0}
+#tv-chart[hidden],#lw-chart[hidden]{display:none}
+#tv-chart iframe{width:100%!important;height:100%!important}
+.chart-tools{position:absolute;left:8px;top:8px;display:flex;flex-direction:column;gap:10px;z-index:8}
+.round{width:42px;height:42px;border-radius:50%;background:var(--round);color:var(--round-t);font-size:13px;font-weight:600}
+.round.light{background:#eee;color:#555}
+.trade-bar{padding:8px 16px calc(8px + 0px);background:var(--bg)}
+.stake-row{display:flex;gap:8px;margin-bottom:8px}
+.stake-row input{flex:1;min-width:0;text-align:center;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px;font-size:18px;font-weight:600;padding:8px}
+.step{width:48px;border-radius:10px;background:var(--card);border:1px solid var(--line);font-size:22px;position:relative;overflow:hidden;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;
+  transition:transform .12s cubic-bezier(.2,.8,.2,1),background-color .18s,border-color .18s,color .18s}
+.step:active{transform:scale(.86);background:color-mix(in srgb,var(--card) 82%,var(--text) 18%)}
+.step::after{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:currentColor;opacity:0;pointer-events:none}
+.step.pop::after{animation:stepRipple .55s ease-out}
+.step.bump{animation:stepBump .3s cubic-bezier(.3,1.6,.5,1),stepGlow .9s ease-out}
+#stake-plus{--glow:#2ebd85}#stake-minus{--glow:#e5484d}
+@keyframes stepGlow{0%{border-color:var(--glow);color:var(--glow);box-shadow:0 0 12px -2px var(--glow)}100%{border-color:var(--line);color:inherit;box-shadow:0 0 0 0 transparent}}
+@keyframes stepRipple{from{opacity:.38;transform:scale(1)}to{opacity:0;transform:scale(8)}}
+@keyframes stepBump{0%{transform:scale(.84)}55%{transform:scale(1.1)}100%{transform:scale(1)}}
+.dir-row{display:flex;gap:16px}
+.dir{flex:1;height:56px;border-radius:10px;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:12px}
+.dir .ico{border:2px solid var(--border2);border-radius:50%;width:34px;height:34px;line-height:30px;font-size:20px}
+.dir.down{background:var(--down);color:var(--down-t)} .dir.up{background:var(--up);color:var(--up-t)}
+.dir.down .ico{border-color:currentColor} .dir.up .ico{border-color:currentColor}
+.dir:disabled{opacity:.5}
+.dir[hidden]{display:none}
+.stake-row .lev:disabled{opacity:.6}
+.pos-row{display:flex;align-items:center;gap:12px;height:56px}
+.pos-row[hidden],.dir-row[hidden]{display:none}
+.pos-info{flex:1;min-width:0}.pos-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pos-time{color:var(--muted);font-size:13px}
+.pos-pnl{font-size:22px;font-weight:700}
+.stop{background:var(--inv);color:var(--inv-t);border-radius:10px;font-weight:700;font-size:20px;padding:10px 22px}
+
+/* --- прочее --- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px;position:relative;text-align:left;width:100%;display:block}
+.card .big{font-size:30px;font-weight:700;margin-top:4px}
+.big-plus{width:44px;height:44px;border-radius:50%;font-size:28px;top:50%;right:14px;margin-top:-22px}
+.menu button{display:flex;align-items:center;gap:14px;width:100%;padding:16px 4px;font-size:20px;border-bottom:1px solid var(--line)}
+.menu button i{margin-left:auto;font-style:normal;font-size:28px}
+.version{color:var(--muted);font-size:13px;margin-top:auto;padding-top:20px}
+.list .item{background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.item .t{font-weight:600}.item .d{color:var(--muted);font-size:14px;margin-top:2px}
+.widget-box{height:420px;border-radius:12px;overflow:hidden;background:var(--card)}
+.widget-box.tall{height:520px}
+
+.nav{display:flex;border-top:1px solid var(--line);background:var(--bg);padding-bottom:var(--safe-b)}
+.nav button{flex:1;padding:4px 0 6px;color:var(--muted);font-size:11px;font-weight:600}
+.nav button span{display:block;font-size:17px;line-height:1.25;filter:grayscale(1)}
+.nav button.active{color:var(--text)}.nav button.active span{filter:none}
+
+/* --- шторка --- */
+#sheet-back{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20}
+#sheet{position:fixed;left:0;right:0;bottom:0;max-height:78%;overflow-y:auto;background:var(--sheet);border-radius:24px 24px 0 0;z-index:21;padding:8px 16px calc(16px + var(--safe-b))}
+#sheet[hidden],#sheet-back[hidden],#toast[hidden]{display:none}
+.grab{width:44px;height:5px;border-radius:3px;background:var(--border2);margin:4px auto 12px}
+#sheet h3{text-align:center;font-size:22px;margin:6px 0 14px;font-weight:500}
+.row{display:flex;align-items:center;gap:12px;padding:14px 6px;border-bottom:1px solid var(--line);font-size:18px}
+.row.sel{background:var(--card2)}
+.row .sub{color:var(--muted);font-size:14px}
+.row .grow{flex:1;min-width:0}
+.chips{display:flex;gap:8px;margin-bottom:8px}
+.chip{border:1.5px solid var(--border2);border-radius:20px;padding:8px 18px}
+.chip.on{background:var(--inv);color:var(--inv-t)}
+.star{font-size:22px;color:var(--muted)}.star.on{color:#f5b301}
+.pill{border:1px solid var(--line);border-radius:10px;padding:6px 12px}
+.pill.on{background:var(--accent);border-color:var(--accent);color:var(--accent-t)}
+#toast{white-space:pre-line;position:fixed;left:16px;right:16px;bottom:96px;background:var(--toast);color:var(--toast-t);border-radius:12px;padding:12px 14px;z-index:30;text-align:center}
+
+/* --- экран «Сделки» --- */
+#trades-view{position:fixed;inset:0;z-index:15;background:var(--bg);display:flex;flex-direction:column}
+#trades-view[hidden]{display:none}
+.tr-top{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;padding:14px 8px 8px}
+.tr-top h2{margin:0;text-align:center;font-size:24px}
+#tr-back{font-size:40px;line-height:1;padding:0 8px}
+.tr-chips{justify-content:center;padding:6px 12px 12px;border-bottom:1px solid var(--line);margin:0}
+#tr-list{flex:1;overflow-y:auto}
+.tr-row{border-bottom:1px solid var(--line)}
+.tr-head{display:flex;align-items:center;gap:12px;width:100%;padding:18px 16px;font-size:20px;text-align:left}
+.tr-st{width:30px;height:30px;border:2px solid var(--muted);border-radius:50%;text-align:center;line-height:26px;font-size:16px;flex:none}
+.tr-st.live{border-color:var(--accent);color:var(--accent);animation:pulse calc(1.4s * var(--ak)) infinite}
+@keyframes pulse{50%{opacity:.35}}
+.coin{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;box-sizing:border-box;width:26px;height:26px;border-radius:50%;color:#fff;font-size:14px;font-weight:700;text-align:center;line-height:1;flex:none;box-shadow:inset 0 0 0 .8px rgba(255,255,255,.22);text-shadow:0 1px 1px rgba(0,0,0,.25)}
+.tr-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tr-pnl{font-weight:600}
+.tr-chev{color:var(--muted);width:24px;text-align:center;font-size:22px}
+.tr-body{padding:0 16px 18px 58px}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;font-size:19px}
+.kv span:first-child{color:var(--muted)}
+.tr-btns{display:flex;gap:10px;margin-top:12px}
+.tr-btns .more{flex:1;border:1px solid var(--border2);border-radius:10px;padding:12px;font-weight:600;font-size:17px;background:var(--card)}
+.tr-btns .share{width:62px;border:1px solid var(--border2);border-radius:10px;background:var(--card);font-size:20px}
+.tr-total{border-top:1px solid var(--line);background:var(--card);text-align:center;padding:16px 16px calc(18px + var(--safe-b));font-size:22px}
+.tr-sum{font-size:38px;font-weight:700;margin-top:6px}
+.tr-empty{text-align:center;color:var(--muted);padding:40px 16px}
+
+/* --- уведомления и выбор валюты --- */
+.round{position:relative}
+.tap{cursor:pointer}
+.asset-card{display:flex;align-items:center;gap:12px;border:1.5px solid var(--text);border-radius:14px;padding:16px;font-size:22px;font-weight:700;margin-bottom:18px}
+.asset-card .grow{flex:1}.asset-card .px{font-weight:500;color:var(--muted)}
+.new-alert{display:flex;align-items:center;gap:14px;font-size:22px;font-weight:600;margin:18px 4px 14px}
+.presets{display:flex;gap:12px;margin:6px 0 18px}
+.preset{width:58px;height:58px;border-radius:50%;border:1px solid var(--line);background:var(--bg);font-size:15px;line-height:1.1;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.preset small{font-size:14px;color:var(--muted)}
+.preset.dn{color:#ff6b57}.preset.upc{color:#5fd06b}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.fld label{display:block;color:var(--muted);font-size:17px;margin-bottom:8px}
+.fld input,.comment input,.search input{width:100%;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:16px;font-size:22px;outline:none}
+.fld input:focus,.comment input:focus,.search input:focus{border-color:var(--muted)}
+.comment{margin:16px 0}.comment label{display:block;color:var(--muted);font-size:17px;margin-bottom:8px}.comment input{font-size:18px}
+.btn-green{width:100%;background:var(--accent);color:var(--accent-t);border:2px solid var(--accent);border-radius:14px;padding:18px;font-size:22px;font-weight:700}
+.alert-row .st{font-size:14px}
+.alert-row .x{font-size:22px;color:var(--muted);padding:6px 10px}
+.search{position:sticky;top:-8px;background:var(--sheet);padding:4px 0 10px;z-index:2}
+.search input{font-size:18px;padding:13px 14px}
+.spot-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 4px 0;font-size:16px;cursor:pointer;position:relative}
+.spot-row .sub{color:var(--muted);font-size:13px}
+.search input.spot-in{position:absolute;right:0;top:0;width:1px;height:1px;opacity:0;padding:0;margin:0;border:0}
+.spot-sw{flex:none;width:48px;height:28px;border-radius:14px;background:var(--line);position:relative;transition:background calc(.2s * var(--ak))}
+.spot-sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform calc(.2s * var(--ak))}
+.spot-in:checked+.spot-sw{background:var(--accent)}
+.spot-in:checked+.spot-sw::after{transform:translateX(20px)}
+.cur-row{display:flex;align-items:center;gap:16px;padding:15px 10px;font-size:19px;border-radius:8px}
+.cur-row .fl{font-size:28px;width:34px;text-align:center}
+.cur-row .nm{flex:1}.cur-row .ck{font-size:26px}
+.cur-row.sel{background:var(--card2)}
+.hint{color:var(--muted);font-size:13px;text-align:center;padding:10px}
+
+.round[hidden]{display:none}
+#lw-legend{position:absolute;inset:0;pointer-events:none;z-index:3}
+#lw-legend .lg{position:absolute;left:0;right:0;border-top:1px solid var(--line);padding:2px 8px 0 56px;font-size:11px;color:var(--muted,#8b9099);white-space:nowrap}
+#lw-legend .lg b{color:var(--text);font-weight:600;margin-left:4px}
+
+/* --- линия тренда, лупа, окно «Настройки» индикатора --- */
+#trend-svg{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;touch-action:none;overflow:hidden}
+#place-ov{position:absolute;inset:0;z-index:6;touch-action:none;background:rgba(255,255,255,.015)}
+#place-ov[hidden]{display:none}
+#mag{position:absolute;left:10px;bottom:38px;width:132px;height:132px;border-radius:50%;border:2px solid var(--text);
+  box-shadow:0 4px 14px rgba(0,0,0,.6);z-index:9;pointer-events:none;background:var(--bg)}
+#mag[hidden]{display:none}
+.round.on{background:var(--accent);color:var(--accent-t)}
+.set-t{font-size:22px;margin:20px 0 12px;font-weight:500}
+.set-g{display:grid;gap:12px;grid-template-columns:repeat(var(--c,3),minmax(0,1fr))}
+.set-f label{display:block;color:var(--muted);font-size:16px;margin-bottom:6px}
+.set-f input{width:100%;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:14px 12px;font-size:20px;outline:none}
+.dd{position:relative}
+.dd-b{width:100%;height:54px;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:0 10px}
+.dd-b i{font-style:normal;color:var(--muted);font-size:18px}
+.dd-b .sw,.dd-o .sw{flex:1;height:8px;border-radius:4px;display:block}
+.dd-b .ln,.dd-o .ln{flex:1;background:var(--muted);display:block}
+.dd-b .tx{flex:1;text-align:left;font-size:18px}
+.dd-l{position:absolute;left:0;right:0;top:58px;background:var(--pop);border:1px solid var(--line);border-radius:10px;z-index:6;max-height:240px;overflow:auto}
+.dd-l[hidden]{display:none}
+.dd-o{display:flex;align-items:center;padding:13px 12px}
+.dd-o:active{background:var(--card2)}
+.btn-link{display:block;width:100%;text-align:center;font-weight:600;font-size:18px;padding:18px 10px 6px}
+.gear{font-size:20px;padding:0 6px}
+
+/* --- биржа, плечо --- */
+.quote-r{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.ex-pill{border:1.5px solid var(--border2);border-radius:16px;padding:5px 12px;font-size:14px;font-weight:600;background:var(--card);white-space:nowrap}
+.ex-pill[hidden]{display:none}
+.ex-row{display:flex;align-items:center;justify-content:flex-end;gap:6px}
+.ex-prev{font-size:13px;padding:5px 10px;color:var(--muted);border-color:var(--line);max-width:112px;overflow:hidden;text-overflow:ellipsis}
+.ex-prev:active{background:var(--card)}
+/* капля: от касания по воде расходятся кольца, а плашка биржи «падает» и расплёскивается */
+.ex-pill{position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;transition:transform .15s cubic-bezier(.2,.8,.2,1)}
+.ex-pill:active{transform:scale(.94)}
+.drop-ring{position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;border:2px solid currentColor;opacity:.55;pointer-events:none;animation:dropRing .75s cubic-bezier(.2,.6,.3,1) forwards}
+.drop-ring.r2{animation-delay:.14s;opacity:.35}
+.drop-ring.r3{animation-delay:.28s;opacity:.2}
+@keyframes dropRing{to{transform:scale(var(--s,14));opacity:0;border-width:.5px}}
+.ex-pill.drop{animation:dropPlop .7s cubic-bezier(.3,1.3,.5,1)}
+.ex-prev.drop{animation-delay:.09s}
+@keyframes dropPlop{
+  0%{transform:translateY(-14px) scale(.65,1.3);opacity:0;border-radius:50% 50% 50% 50%/70% 70% 30% 30%}
+  30%{transform:translateY(0) scale(.88,1.18);opacity:1;border-radius:46% 46% 54% 54%/60% 60% 40% 40%}
+  50%{transform:translateY(0) scale(1.16,.82)}
+  70%{transform:scale(.96,1.05)}
+  85%{transform:scale(1.02,.99)}
+  100%{transform:none}
+}
+.stake-row .lev{min-width:68px;border-radius:10px;background:var(--card);border:1px solid var(--line);font-size:18px;font-weight:700;color:#f5b301;padding:0 10px}
+.lvl{color:#f5b301;font-weight:700}
+.tr-ex{display:block;color:var(--muted);font-size:13px;font-weight:400}
+.lev-big{text-align:center;font-size:44px;font-weight:700;color:#f5b301;margin:2px 0 10px}
+.lev-chips{flex-wrap:wrap;justify-content:center;margin-bottom:10px}
+.lev-chips .chip{padding:8px 14px}
+.lev-range{width:100%;margin:6px 0 14px;accent-color:var(--accent)}
+
+/* --- картинки монет (icons.js) --- */
+.aic{display:inline-flex;align-items:center;flex:none;vertical-align:middle}
+.aic .ic{display:block;flex:none}
+.aic.pair .ic + .ic{border-radius:50%;box-shadow:0 0 0 2px var(--bg)}
+img.aic{border-radius:50%;object-fit:cover}
+.quote-main{display:flex;align-items:center;gap:10px}
+#q-icon:empty{display:none}
+.tab-name{display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.asset-card .aic{margin-right:2px}
+
+/* --- тейк-профит / стоп-лосс --- */
+.tpsl-btn{font-size:10px;line-height:1.05;letter-spacing:.2px}
+#tpsl-svg{position:absolute;inset:0;width:100%;height:100%;z-index:5;pointer-events:none;touch-action:none;overflow:hidden}
+#tpsl-svg text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;user-select:none;-webkit-user-select:none}
+#tpsl-svg .lv-hit{cursor:ns-resize;touch-action:none}
+.lv-sec{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:600;margin:20px 0 10px}
+.lv-sec:first-child{margin-top:4px}
+.lv-dot{width:12px;height:12px;border-radius:50%;flex:none}
+.lv-sec .lv-rm{margin-left:auto;font-size:15px;font-weight:500;color:var(--muted);padding:4px 8px}
+.lv-hint{color:var(--muted);font-size:13px;margin-top:8px;line-height:1.35}
+.lv-hint .bad{color:#ff6b57}
+.lv-info{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:15px;margin-bottom:6px}
+.lv-info .kv{padding:4px 0;font-size:15px}
+.lv-chips{flex-wrap:wrap;margin:10px 0 0}
+.lv-chips .chip{padding:6px 14px;font-size:14px}
+
+/* --- админка --- */
+.menu button[hidden]{display:none}
+#admin-view{position:fixed;inset:0;z-index:15;background:var(--bg);display:flex;flex-direction:column}
+#admin-view[hidden]{display:none}
+.ad-ref{font-size:26px;line-height:1;padding:0 8px}
+.ad-sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:2px 12px 10px}
+.ad-sum div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 4px;text-align:center}
+.ad-sum b{display:block;font-size:16px}
+.ad-sum small{color:var(--muted);font-size:11px}
+.ad-tools{padding:10px 12px 0}
+.ad-tools[hidden]{display:none}
+.ad-search input{width:100%;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:16px;outline:none}
+.ad-search input:focus{border-color:var(--muted)}
+.ad-sorts{margin:8px 0 6px;overflow-x:auto;scrollbar-width:none}
+.ad-sorts::-webkit-scrollbar{display:none}
+.ad-sorts .chip{padding:6px 14px;font-size:14px;white-space:nowrap}
+#ad-list{flex:1;min-height:0;overflow-y:auto;padding-bottom:calc(8px + var(--safe-b))}
+.ad-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;border-bottom:1px solid var(--line)}
+.ad-av{width:40px;height:40px;border-radius:50%;background:var(--pop);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex:none;position:relative}
+.ad-av.on::after{content:"";position:absolute;right:0;bottom:0;width:11px;height:11px;border-radius:50%;background:var(--green);border:2px solid var(--bg)}
+.ad-main{flex:1;min-width:0}
+.ad-main b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.ad-main small,.ad-right small{display:block;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ad-right{text-align:right;flex:none;max-width:48%}
+.ad-right b{display:block}
+.ad-note{color:var(--muted);font-size:13px;text-align:center;padding:12px 16px}
+#net-banner{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 8px);background:#b3261e;color:#fff;font-size:13px;padding:6px 14px;border-radius:14px;z-index:40;pointer-events:none}
+#net-banner[hidden]{display:none}
+
+/* --- темы --- */
+.theme-row{display:flex;align-items:center;gap:12px}
+.theme-sw{display:flex;flex:none;width:54px;height:34px;border-radius:9px;overflow:hidden;border:1px solid var(--border2)}
+.theme-sw i{flex:1}
+.theme-row .ck{color:var(--accent);font-weight:700;font-size:18px}
+html{color-scheme:dark}
+html.light{color-scheme:light}
+
+/* ================= АДАПТИВНОСТЬ: вертикально, горизонтально, планшет, ПК ================= */
+#app{height:100vh;height:100dvh;padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.page{min-width:0}
+
+/* все экраны, кроме торговли: содержимое по центру, не растягивается на весь монитор */
+.page:not(#page-trade){align-items:center}
+.page:not(#page-trade)>*{width:100%;max-width:760px}
+#trades-view,#admin-view{align-items:center}
+#trades-view>*,#admin-view>*{width:100%;max-width:860px}
+
+/* планшет вертикально: чуть крупнее, по центру */
+@media (min-width:640px) and (orientation:portrait){
+  #page-trade .trade-bar{padding:10px 20px;max-width:720px;margin:0 auto;width:100%}
+  .tabs,.quote{max-width:900px;margin-left:auto;margin-right:auto;width:100%}
+}
+
+/* ---- ШИРОКИЙ РЕЖИМ: телефон/планшет горизонтально и ПК ---- */
+@media (min-width:640px) and (orientation:landscape), (min-width:1000px){
+  #app{flex-direction:row}
+  /* боковая панель навигации вместо нижней */
+  .nav{order:-1;flex-direction:column;justify-content:flex-start;width:64px;flex:none;border-top:0;border-right:1px solid var(--line);padding:10px 0}
+  .nav button{flex:none;padding:9px 0}
+
+  /* торговля: слева график, справа панель ставки */
+  #page-trade.active{display:grid;grid-template-columns:minmax(0,1fr) clamp(280px,28vw,400px);grid-template-rows:auto auto auto minmax(0,1fr)}
+  #page-trade>.top{grid-column:1;grid-row:1}
+  #page-trade>.tabs{grid-column:1;grid-row:2}
+  #page-trade>.quote{grid-column:1;grid-row:3}
+  #page-trade>.chart-wrap{grid-column:1;grid-row:4}
+  #page-trade>.trade-bar{grid-column:2;grid-row:1/-1;display:flex;flex-direction:column;gap:14px;justify-content:center;
+    padding:16px 18px;border-left:1px solid var(--line);overflow-y:auto}
+  .trade-bar .stake-row{margin-bottom:0}
+  .trade-bar .dir-row{flex-direction:column;gap:12px}
+  .trade-bar .dir{flex:none;height:68px}
+  .trade-bar .pos-row{flex-direction:column;align-items:stretch;height:auto;gap:10px}
+  .trade-bar .pos-pnl{text-align:center;font-size:30px}
+  .trade-bar .stop{padding:16px;font-size:22px}
+
+  /* окна по центру, а не шторкой снизу */
+  #sheet{left:50%;right:auto;top:50%;bottom:auto;width:min(560px,92vw);max-height:88%;transform:translate(-50%,-50%);border-radius:20px}
+  .grab{display:none}
+  #toast{left:50%;right:auto;transform:translateX(-50%);width:max-content;max-width:min(460px,90vw);bottom:24px}
+}
+
+/* ---- низкие экраны (телефон горизонтально): ужимаем, чтобы график остался большим ---- */
+@media (max-height:520px) and (orientation:landscape){
+  .nav{width:58px;padding:4px 0}
+  .nav button{padding:7px 0;font-size:10px}
+  .nav button span{font-size:18px}
+  .top{padding:4px 12px 2px}
+  .balance{font-size:16px}
+  .tabs{padding:3px 12px}
+  .tab{min-width:84px;padding:4px 10px;border-radius:10px}
+  .tab small{font-size:11px}
+  .quote{padding:2px 12px 0}
+  .price{font-size:20px}
+  .chart-tools{gap:6px;flex-wrap:wrap;max-height:calc(100% - 16px);align-content:flex-start}
+  .round{width:34px;height:34px;font-size:11px}
+  #page-trade>.trade-bar{padding:8px 12px;gap:8px}
+  .trade-bar .dir{height:46px;font-size:18px}
+  .trade-bar .stop{padding:10px}
+  #sheet{max-height:94%}
+}
+
+/* ПК: мышь — подсказка курсора и аккуратный скролл */
+@media (hover:hover) and (pointer:fine){
+  .tab,.row.tap,.nav button,.dir,.stop,.round,.pill,.chip{transition:filter calc(.12s * var(--ak))}
+  .tab:hover,.row.tap:hover,.round:hover,.pill:hover,.chip:hover{filter:brightness(1.15)}
+  .dir:hover,.stop:hover{filter:brightness(1.1)}
+  .tabs{scrollbar-width:thin}
+  .page{scrollbar-width:thin}
+}
+
+/* --- Аналитика: всегда тёмная (виджеты TradingView тёмные), независимо от темы приложения --- */
+#page-analytics{--bg:#16181d;--card:#1f2227;--card2:#272b32;--line:#2e3239;--text:#ffffff;--muted:#8b9099;
+  background:#16181d;color:#ffffff}
+/* пока вкладка не открыта, виджеты живут за кадром (а не в display:none) — иначе у них нулевой размер и они грузятся заново */
+#page-analytics:not(.active){display:flex;flex-direction:column;position:absolute;left:0;top:0;width:100%;height:100%;
+  visibility:hidden;pointer-events:none;overflow:hidden;z-index:-1}
+
+.an-head{position:relative;display:flex;align-items:center;justify-content:center}
+.an-ref{position:absolute;right:4px;top:50%;margin-top:-20px;width:40px;height:40px;font-size:26px;line-height:1;color:var(--text);border-radius:50%}
+.an-ref:active{background:var(--card2)}
+.an-ref.spin{animation:anspin calc(.9s * var(--ak)) linear}
+@keyframes anspin{to{transform:rotate(360deg)}}
+/* iframe с «чужой» цветовой схемой браузер закрашивает сплошным белым — фиксируем тёмную схему для всей вкладки */
+#page-analytics,#page-analytics *{color-scheme:dark}
+#page-analytics .widget-box{background:#16181d}
+
+/* значки бирж */
+.eic{display:inline-flex;align-items:center;vertical-align:middle;flex:none;margin-right:6px}
+.eic .ic{display:block;border-radius:50%}
+.row > .eic{margin-right:0}
+.ex-pill,.ex-prev{display:inline-flex;align-items:center}
+
+/* шторка: плавность и ползунок */
+#sheet{overscroll-behavior:contain}
+#sheet-back{opacity:1}
+.lev-range{-webkit-appearance:none;appearance:none;width:100%;height:32px;margin:6px 0 14px;background:transparent;touch-action:none;cursor:pointer;--p:0%}
+.lev-range:focus{outline:none}
+.lev-range::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:linear-gradient(to right,var(--accent) var(--p),var(--card2) var(--p))}
+.lev-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:28px;height:28px;margin-top:-10px;border-radius:50%;background:#fff;border:3px solid var(--accent);box-shadow:0 1px 5px rgba(0,0,0,.4)}
+.lev-range::-moz-range-track{height:8px;border-radius:4px;background:var(--card2)}
+.lev-range::-moz-range-progress{height:8px;border-radius:4px;background:var(--accent)}
+.lev-range::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid var(--accent);box-shadow:0 1px 5px rgba(0,0,0,.4)}
+
+/* ================= нижняя навигация: капсула со «стеклянным» ползунком ================= */
+.nav{position:relative;margin:6px 14px calc(8px + var(--safe-b));padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--card);
+  touch-action:none;-webkit-user-select:none;user-select:none}
+.nav button{position:relative;z-index:1;border-radius:999px;padding:5px 0 6px;transition:color calc(.2s * var(--ak))}
+.nav-glass{position:absolute;top:4px;bottom:4px;left:0;width:0;border-radius:999px;pointer-events:none;z-index:2;--gx:0px;--gs:1;
+  transform:translateX(var(--gx)) scale(var(--gs));will-change:transform;
+  background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 2px 8px rgba(0,0,0,.25);
+  transition:transform calc(.36s * var(--ak)) cubic-bezier(.3,1.3,.5,1),width calc(.3s * var(--ak)) ease,background calc(.2s * var(--ak)),box-shadow calc(.2s * var(--ak))}
+.nav.drag .nav-glass{transition:width calc(.2s * var(--ak)) ease,background calc(.2s * var(--ak)),box-shadow calc(.2s * var(--ak))}
+.nav.pressed .nav-glass{--gs:1.1}
+html.light .nav-glass{background:rgba(0,0,0,.07);box-shadow:inset 0 0 0 1px rgba(0,0,0,.08),0 2px 8px rgba(0,0,0,.12)}
+
+/* боковая панель (ПК, планшет, телефон горизонтально): прежний вид без капсулы и без ползунка.
+   Здесь сбрасываем всё, что капсула переопределила (рамка, отступы, скругления), иначе панель выглядит битой. */
+@media (min-width:640px) and (orientation:landscape), (min-width:1000px){
+  .nav.nav{margin:0;border:0;border-right:1px solid var(--line);border-radius:0;background:var(--bg);padding:10px 0;
+    -webkit-backdrop-filter:none;backdrop-filter:none;touch-action:auto;-webkit-user-select:auto;user-select:auto}
+  .nav.nav button{flex:none;padding:9px 0;border-radius:0}
+  .nav-glass{display:none}
+}
+@media (max-height:520px) and (orientation:landscape){
+  .nav.nav{margin:0;border:0;border-right:1px solid var(--line);border-radius:0;background:var(--bg);padding:4px 0;
+    -webkit-backdrop-filter:none;backdrop-filter:none;touch-action:auto;-webkit-user-select:auto;user-select:auto}
+  .nav.nav button{flex:none;padding:7px 0;border-radius:0}
+  .nav-glass{display:none}
+}
+
+/* --- обучение по навигации --- */
+#tour{position:fixed;inset:0;z-index:100;overflow:hidden;touch-action:none}
+#tour[hidden]{display:none}
+#tour.center{background:rgba(0,0,0,.78)}
+#tour-hole{position:absolute;border-radius:14px;pointer-events:none;box-shadow:0 0 0 2px var(--accent),0 0 0 100vmax rgba(0,0,0,.78);
+  transition:left calc(.25s * var(--ak)) ease,top calc(.25s * var(--ak)) ease,width calc(.25s * var(--ak)) ease,height calc(.25s * var(--ak)) ease}
+#tour.center #tour-hole{box-shadow:none;border-radius:0}
+#tour-skip{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));right:12px;z-index:2;padding:8px 14px;border-radius:999px;
+  background:rgba(255,255,255,.18);color:#fff;font-size:14px;font-weight:600;backdrop-filter:blur(6px)}
+#tour-skip[hidden]{display:none}
+#tour-tip{position:absolute;z-index:1;background:var(--sheet);color:var(--text);border:1px solid var(--line);border-radius:16px;padding:14px 16px;
+  width:max-content;box-shadow:0 8px 28px rgba(0,0,0,.45);transition:left calc(.25s * var(--ak)) ease,top calc(.25s * var(--ak)) ease}
+#tour-tip .tt-title{font-size:18px;font-weight:700;margin-bottom:6px}
+#tour-tip .tt-text{font-size:15px;line-height:1.4;white-space:pre-line;color:var(--text);opacity:.88}
+#tour-tip .tt-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
+#tour-tip .tt-step{color:var(--muted);font-size:13px}
+#tour-tip .tt-btns{display:flex;gap:8px}
+#tour-tip .tt-btns button{padding:9px 16px;border-radius:10px;background:var(--card2);font-weight:600;font-size:15px}
+#tour-tip .tt-btns button.primary{background:var(--accent);color:var(--accent-t)}
+
+/* --- подсказки «?» --- */
+#hints{position:fixed;left:0;top:0;width:0;height:0;z-index:14;pointer-events:none}
+#hints[hidden]{display:none}
+.qm{position:absolute;left:0;top:0;width:22px;height:22px;padding:0;display:flex;align-items:center;justify-content:center;pointer-events:auto}
+.qm[hidden]{display:none}
+.qm i{width:16px;height:16px;border-radius:50%;background:var(--card2);color:var(--muted);border:1px solid var(--border2);
+  font:700 11px/14px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-style:normal;text-align:center;opacity:.92}
+.qm:active i{background:var(--accent);color:var(--accent-t);border-color:var(--accent)}
+#hint-pop{position:fixed;z-index:18;background:var(--sheet);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+  width:max-content;box-shadow:0 8px 24px rgba(0,0,0,.45);font-size:14px;line-height:1.4}
+#hint-pop[hidden]{display:none}
+#hint-pop .hp-off{display:block;margin-top:8px;padding:0;color:var(--muted);font-size:12px;text-decoration:underline}
+.set-sw{cursor:pointer;position:relative}
+.set-sw .spot-in{position:absolute;right:0;top:0;width:1px;height:1px;opacity:0;margin:0;padding:0;border:0}
+
+/* =====================================================================================================
+   Анимации в стиле Hyprland / Quickshell (serpantinum): кривая «myBezier» (0.05, 0.9, 0.1, 1.05) — быстрый старт и лёгкий
+   перелёт; окна «выскакивают» из ~85% размера; закрытие всегда короче открытия; кнопки мягко «продавливаются» (OutBack).
+   Двигаем только opacity / translate / scale — это дёшево для GPU. Выключается в Настройках («Плавные анимации»)
+   и автоматически, если в системе включено «уменьшить движение».
+   ===================================================================================================== */
+:root{--ak:2;--e-pop:cubic-bezier(.05,.9,.1,1.05);--e-out:cubic-bezier(.215,.61,.355,1);--e-back:cubic-bezier(.34,1.35,.64,1);
+  --e-in:cubic-bezier(.55,.085,.68,.53);--e-expo:cubic-bezier(.16,1,.3,1)}
+@keyframes fadeIn{from{opacity:0}}
+@keyframes rise{from{opacity:0;translate:0 12px}}
+@keyframes popIn{from{opacity:0;scale:.85}}
+@keyframes slideInR{from{opacity:0;translate:28px 0}}
+@keyframes slideOutR{to{opacity:0;translate:28px 0}}
+@keyframes toastIn{from{opacity:0;translate:0 14px;scale:.94}}
+@keyframes toastOut{to{opacity:0;translate:0 10px;scale:.96}}
+@keyframes flUp{from{color:var(--green)}}
+@keyframes flDn{from{color:var(--red)}}
+@keyframes tabNew{from{opacity:0;scale:.7}}
+@keyframes tabSel{from{scale:.93}}
+@keyframes navPop{40%{scale:1.25;translate:0 -3px}}
+
+/* страницы: вход делает слайд (app.js → slidePages), отдельной анимации появления нет — иначе после слайда она играет второй раз и экран дёргается */
+
+/* шторка: содержимое выезжает каскадом, при смене шторки на шторку — мягкая подмена */
+#sheet.opening #sheet-body>*{animation:rise calc(.42s * var(--ak)) var(--e-pop) backwards}
+#sheet.opening #sheet-body>*:nth-child(2){animation-delay:calc(32ms * var(--ak))}
+#sheet.opening #sheet-body>*:nth-child(3){animation-delay:calc(64ms * var(--ak))}
+#sheet.opening #sheet-body>*:nth-child(4){animation-delay:calc(96ms * var(--ak))}
+#sheet.opening #sheet-body>*:nth-child(5){animation-delay:calc(128ms * var(--ak))}
+#sheet.opening #sheet-body>*:nth-child(6){animation-delay:calc(160ms * var(--ak))}
+#sheet.opening #sheet-body>*:nth-child(7){animation-delay:calc(192ms * var(--ak))}
+#sheet.opening #sheet-body>*:nth-child(8){animation-delay:calc(224ms * var(--ak))}
+#sheet.opening #sheet-body>*:nth-child(9){animation-delay:calc(256ms * var(--ak))}
+#sheet.swap #sheet-body{animation:fadeIn calc(.22s * var(--ak)) var(--e-out)}
+
+/* экраны «Сделки» и «Админка» заезжают справа и уезжают обратно */
+#trades-view:not([hidden]),#admin-view:not([hidden]){animation:slideInR calc(.34s * var(--ak)) var(--e-pop)}
+#trades-view.ov-out,#admin-view.ov-out{animation:slideOutR calc(.2s * var(--ak)) var(--e-in) forwards}
+
+/* подсказка-уведомление */
+#toast:not([hidden]){animation:toastIn calc(.34s * var(--ak)) var(--e-back)}
+#toast.out{animation:toastOut calc(.2s * var(--ak)) var(--e-in) forwards}
+
+/* списки при открытии / смене фильтра */
+.enter>*{animation:rise calc(.4s * var(--ak)) var(--e-pop) backwards}
+.enter>*:nth-child(2){animation-delay:calc(30ms * var(--ak))}
+.enter>*:nth-child(3){animation-delay:calc(60ms * var(--ak))}
+.enter>*:nth-child(4){animation-delay:calc(90ms * var(--ak))}
+.enter>*:nth-child(5){animation-delay:calc(120ms * var(--ak))}
+.enter>*:nth-child(6){animation-delay:calc(150ms * var(--ak))}
+.enter>*:nth-child(7){animation-delay:calc(180ms * var(--ak))}
+.enter>*:nth-child(8){animation-delay:calc(210ms * var(--ak))}
+.enter>*:nth-child(9){animation-delay:calc(240ms * var(--ak))}
+.enter>*:nth-child(10){animation-delay:calc(270ms * var(--ak))}
+
+/* кнопки: мягкое «нажатие» (scale, не transform — чтобы не конфликтовать с остальным) и плавная смена цвета */
+.tab,.dir,.stop,.round,.pill,.chip,.icon-btn,.menu button,.card.link,.btn-green,.row.tap,.an-ref,.plus,.tt-btns button,.hp-off{
+  transition:scale calc(.22s * var(--ak)) var(--e-back),filter calc(.12s * var(--ak)),background-color calc(.18s * var(--ak)) var(--e-out),color calc(.18s * var(--ak)) var(--e-out),border-color calc(.18s * var(--ak)) var(--e-out),opacity calc(.18s * var(--ak))}
+.tab:active,.round:active,.pill:active,.chip:active,.icon-btn:active,.an-ref:active,.plus:active,.tt-btns button:active{scale:.94}
+.dir:active,.stop:active,.btn-green:active{scale:.972}
+.row.tap:active,.menu button:active,.card.link:active{scale:.985}
+@media (hover:hover) and (pointer:fine){
+  .tab:hover,.round:hover,.pill:hover,.chip:hover,.icon-btn:hover{scale:1.03}
+  .dir:hover,.stop:hover,.btn-green:hover{scale:1.012}
+}
+
+/* вкладки активов: новая «выскакивает», выбранная чуть пружинит */
+.tab.tab-new{animation:tabNew calc(.42s * var(--ak)) var(--e-back)}
+.tab.tab-sel{animation:tabSel calc(.36s * var(--ak)) var(--e-back)}
+
+/* ставка / позиция: смена блоков «Вверх-Вниз» ↔ «Позиция» */
+#dir-row:not([hidden]),#pos-row:not([hidden]){animation:rise calc(.36s * var(--ak)) var(--e-pop)}
+
+/* цифры: короткая вспышка при росте/падении цены и баланса */
+.fl-up{animation:flUp calc(.55s * var(--ak)) var(--e-out)}
+.fl-dn{animation:flDn calc(.55s * var(--ak)) var(--e-out)}
+
+/* нижнее меню: иконка активного раздела подпрыгивает */
+.nav button span{transition:filter calc(.25s * var(--ak)) var(--e-out)}
+.nav button.active span{animation:navPop calc(.46s * var(--ak)) var(--e-back)}
+
+/* подсказки «?» и обучение */
+.qm:not([hidden]) i{animation:popIn calc(.3s * var(--ak)) var(--e-back)}
+#hint-pop:not([hidden]){animation:popIn calc(.24s * var(--ak)) var(--e-pop);transform-origin:top center}
+#tour:not([hidden]){animation:fadeIn calc(.3s * var(--ak)) var(--e-out)}
+#tour-tip.swap{animation:popIn calc(.3s * var(--ak)) var(--e-pop)}
+.spot-sw{transition:background-color calc(.25s * var(--ak)) var(--e-out)}
+.spot-sw::after{transition:transform calc(.3s * var(--ak)) var(--e-back)}
+
+/* смена темы: цвета перетекают, а не щёлкают */
+html.theming *,html.theming *::before,html.theming *::after{
+  transition:background-color calc(.38s * var(--ak)) var(--e-out),color calc(.38s * var(--ak)) var(--e-out),border-color calc(.38s * var(--ak)) var(--e-out),fill calc(.38s * var(--ak)),stroke calc(.38s * var(--ak)) !important}
+
+/* ставка-«барабан револьвера»: каждая цифра — барабан с 10 гранями (0–9) вокруг горизонтальной оси.
+   Меняется сумма — затронутые цифры прокручиваются (младший разряд первым, остальные каскадом) и «защёлкиваются» с лёгким перелётом.
+   Поле ввода лежит поверх невидимым: тап по барабану открывает клавиатуру, пока печатаешь — виден обычный текст. */
+.stake-wrap{position:relative;flex:1;min-width:0;display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 0;overflow:hidden;cursor:text}
+.stake-row .stake-wrap input{position:absolute;inset:0;width:100%;height:100%;box-sizing:border-box;opacity:0;border:0;border-radius:0;padding:0 8px;background:var(--card)}
+.stake-wrap.editing input{opacity:1}
+.stake-wrap.editing .drum{opacity:0}
+.drum{--h:1.3em;--r:calc(var(--h) * 1.5388);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text);pointer-events:none;user-select:none;-webkit-user-select:none}
+.reel{position:relative;flex:none;width:.64em;height:var(--h);overflow:hidden;perspective:calc(var(--h) * 7);
+  -webkit-mask-image:linear-gradient(transparent,#000 26%,#000 74%,transparent);mask-image:linear-gradient(transparent,#000 26%,#000 74%,transparent)}
+.cyl{position:absolute;inset:0;transform-style:preserve-3d;transform:translateZ(calc(var(--r) * -1)) rotateX(0deg);
+  transition:transform calc(.8s * var(--ak)) cubic-bezier(.2,.9,.25,1.1)}
+.cyl i{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-style:normal;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  transform:rotateX(calc(var(--n) * -36deg)) translateZ(var(--r))}
+.drum .dot{flex:none;width:.32em;text-align:center;line-height:var(--h)}
+/* в покое цифра — обычный плоский текст (3D-слой на дробных пикселях размывает буквы), 3D-барабан включается только на время вращения */
+.reel .flat{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.reel.rest .cyl{visibility:hidden}
+.reel:not(.rest) .flat{visibility:hidden}
+.reel.rest{-webkit-mask-image:none;mask-image:none}
+
+
+/* без анимаций: системная настройка «уменьшить движение» или переключатель в Настройках */
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;animation-delay:0s !important;transition-duration:.01ms !important}}
+html.no-anim *,html.no-anim *::before,html.no-anim *::after{animation-duration:.01ms !important;animation-delay:0s !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+
+/* --- быстрая смена биржи: «жидкое стекло» --- */
+.ex-row{position:relative}
+.ex-pill{background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,0) 60%),var(--card);border-color:var(--border2);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.ex-prev{border-color:var(--line)}          /* нейтральные рамки в цвет темы (раньше: голубая и оранжевая — выбивались из зелёно-красной палитры) */
+.ex-pill,.ex-prev{will-change:transform}
+.swap-fx{position:absolute;left:-16px;top:-22px;overflow:visible;pointer-events:none;z-index:3}
+
+/* --- три режима окна: compact / full / fs --- */
+:root{
+  --safe-b:max(env(safe-area-inset-bottom,0px),var(--tg-safe-area-inset-bottom,0px));
+  --safe-t:calc(max(env(safe-area-inset-top,0px),var(--tg-safe-area-inset-top,0px)) + var(--tg-content-safe-area-inset-top,0px));
+}
+html.pwa-standalone #app{padding-top:var(--safe-t)}
+/* полный экран: отступ под вырез/статус-бар и кнопки Telegram сверху */
+html.fs #app{padding-top:var(--safe-t)}
+html.fs #trades-view,html.fs #admin-view{padding-top:var(--safe-t)}
+html.fs #app{padding-left:max(env(safe-area-inset-left,0px),var(--tg-safe-area-inset-left,0px));padding-right:max(env(safe-area-inset-right,0px),var(--tg-safe-area-inset-right,0px))}
+/* компактное окно: плотная вёрстка, график не меньше 150px, остальное прокручивается */
+html.compact .top{padding:4px 10px 2px}
+html.compact .quote{padding-top:2px;padding-bottom:2px}
+html.compact .chart-wrap{min-height:150px}
+html.compact #page-trade{overflow-y:auto}
+html.compact .trade-bar{padding:4px 12px}
+html.compact .stake-row{margin-bottom:4px}
+html.compact .dir{height:44px;font-size:19px}
+html.compact .round{width:34px;height:34px;font-size:11px}
+html.compact .chart-tools{gap:6px}
+html.compact .nav{margin-top:2px;margin-bottom:calc(4px + var(--safe-b))}
+html.compact h1{margin:8px 0;font-size:19px}
+
+/* --- нижний бар: «жидкое стекло» с шлейфом, эхо-копиями, искрами и вспышкой (позиции считает JS в navGlass) --- */
+.nav .nav-glass,.nav.drag .nav-glass{transition:none;transform:none;will-change:transform,width;
+  background:radial-gradient(120% 150% at 28% 12%,rgba(var(--fx1),.40),rgba(var(--fx2),.34) 55%,rgba(var(--fx3),.44));
+  border:1px solid rgba(var(--fx1),calc(.55 + var(--gl,0) * .4));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -6px 12px rgba(var(--fx3),.35),0 0 calc(8px + var(--gl,0) * 22px) rgba(var(--fx2),calc(.35 + var(--gl,0) * .45));
+  -webkit-backdrop-filter:blur(calc(var(--bl,0) * 1px));backdrop-filter:blur(calc(var(--bl,0) * 1px))}
+html.light .nav .nav-glass{background:radial-gradient(120% 150% at 28% 12%,rgba(var(--fx1),.55),rgba(var(--fx2),.30) 55%,rgba(var(--fx3),.38))}
+.nav-trail{position:absolute;top:9px;bottom:9px;left:0;width:0;opacity:0;pointer-events:none;z-index:2;filter:blur(5px);
+  background:linear-gradient(90deg,rgba(var(--fx2),0),rgba(var(--fx2),.6));
+  -webkit-mask-image:repeating-linear-gradient(0deg,#000 0 3px,rgba(0,0,0,.35) 3px 5px);mask-image:repeating-linear-gradient(0deg,#000 0 3px,rgba(0,0,0,.35) 3px 5px)}
+.nav-trail.l{background:linear-gradient(270deg,rgba(var(--fx2),0),rgba(var(--fx2),.6))}
+.nav-ghost{position:absolute;top:4px;bottom:4px;left:0;width:0;border-radius:999px;opacity:0;pointer-events:none;z-index:2;
+  background:linear-gradient(180deg,rgba(var(--fx1),.22),rgba(var(--fx2),.22));border:1px solid rgba(var(--fx1),.5);box-shadow:0 0 12px rgba(var(--fx2),.35);filter:blur(1.2px)}
+.nav-flare{position:absolute;width:28px;height:28px;left:0;top:-10px;opacity:0;pointer-events:none;z-index:4;
+  background:radial-gradient(circle,#fff 0,rgba(var(--fx1),.9) 14%,rgba(var(--fx2),.35) 40%,transparent 70%)}
+.nav-flare::before,.nav-flare::after{content:"";position:absolute;left:50%;top:50%}
+.nav-flare::before{width:46px;height:2px;margin:-1px 0 0 -23px;background:linear-gradient(90deg,transparent,#fff,transparent)}
+.nav-flare::after{width:2px;height:46px;margin:-23px 0 0 -1px;background:linear-gradient(180deg,transparent,#fff,transparent)}
+.nav-sparks{position:absolute;left:-24px;top:-24px;pointer-events:none;z-index:4}
+@media (min-width:640px) and (orientation:landscape), (min-width:1000px){ .nav-fx{display:none} }
+@media (max-height:520px) and (orientation:landscape){ .nav-fx{display:none} }
+
+/* --- появление вкладки монеты: сборка по шагам (1 база → 2 иконки → 3 текст → 4 подпись). Только для новой вкладки. --- */
+.tab.tab-new{animation:tabBase calc(.38s * var(--ak)) var(--e-out) backwards}   /* backwards, не both: после сборки на вкладке не остаётся clip-path/filter → она не создаёт слой, который перекрывала бы рамка */
+.tab.tab-new .aic{animation:tabIcon calc(.34s * var(--ak)) var(--e-back) calc(.22s * var(--ak)) both}
+.tab.tab-new .aic.pair .ic:nth-child(2){animation:tabIcon2 calc(.34s * var(--ak)) var(--e-back) calc(.32s * var(--ak)) both}
+.tab.tab-new .tab-name>span:not(.aic){animation:tabText calc(.3s * var(--ak)) var(--e-out) calc(.5s * var(--ak)) both}
+.tab.tab-new small{animation:tabSub calc(.3s * var(--ak)) var(--e-out) calc(.72s * var(--ak)) both}
+.tab.tab-new::after{content:"";position:absolute;inset:-1.5px;border-radius:inherit;pointer-events:none;box-shadow:0 0 0 0 rgba(var(--fx1),0);animation:tabDone calc(.5s * var(--ak)) ease-out calc(.9s * var(--ak)) both}
+@keyframes tabBase{from{opacity:0;clip-path:inset(0 100% 0 0 round 12px);filter:brightness(1.4)}60%{opacity:1}to{opacity:1;clip-path:inset(-8px -8px -8px -8px round 12px);filter:none}}
+@keyframes tabIcon{from{opacity:0;transform:translateX(-14px) scale(.4)}to{opacity:1;transform:none}}
+@keyframes tabIcon2{from{opacity:0;transform:translateX(-18px) scale(.4)}to{opacity:1;transform:none}}
+@keyframes tabText{from{opacity:0;transform:translateX(-8px);filter:blur(3px)}to{opacity:1;transform:none;filter:none}}
+@keyframes tabSub{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes tabDone{0%{box-shadow:0 0 0 0 rgba(var(--fx1),.55)}100%{box-shadow:0 0 0 7px rgba(var(--fx1),0)}}
+
+/* --- плавающая рамка активной вкладки (позицию считает tabInd в app.js) --- */
+.tabs{position:relative}
+.tabs.has-ind .tab.active{border-color:var(--line)}
+.tab-ind{position:absolute;left:0;top:0;width:0;height:0;border:1.5px solid var(--sel);border-radius:12px;pointer-events:none;z-index:1;color:var(--sel);
+  box-shadow:0 0 calc(var(--gl,0) * 16px) -2px currentColor;will-change:transform,width,filter}
+.tab-ind.tab-ghost{opacity:0;box-shadow:none;filter:blur(1.5px)}
+@media (max-height:520px) and (orientation:landscape){ .tab-ind{border-radius:10px} }
+
+/* --- слайд страниц (app.js → slidePages): новая страница в потоке, уходящая — поверх в тех же границах --- */
+#app{position:relative}
+.page.slide-out{display:flex;flex-direction:column;position:absolute;background:var(--bg);overflow:hidden;will-change:transform,filter;pointer-events:none}
+.page.slide-in{will-change:transform,filter}
+
+/* --- 1) крестик закрытия вкладки поверх красной плавающей рамки --- */
+.tab .x{z-index:3}
+
+/* --- 2) удаление вкладки: появление наоборот (подпись → текст → иконки → база); задержки = T − (старт + длительность) от сборки --- */
+.tab.tab-out{animation:tabBase calc(.38s * var(--ak)) var(--e-out) calc(.64s * var(--ak)) both reverse;pointer-events:none}
+.tab.tab-out .aic{animation:tabIcon calc(.34s * var(--ak)) var(--e-back) calc(.46s * var(--ak)) both reverse}
+.tab.tab-out .aic.pair .ic:nth-child(2){animation:tabIcon2 calc(.34s * var(--ak)) var(--e-back) calc(.36s * var(--ak)) both reverse}
+.tab.tab-out .tab-name>span:not(.aic){animation:tabText calc(.3s * var(--ak)) var(--e-out) calc(.22s * var(--ak)) both reverse}
+.tab.tab-out small{animation:tabSub calc(.3s * var(--ak)) var(--e-out) 0s both reverse}
+
+/* крестик новой вкладки появляется, когда база уже собрана (пока она собирается, рамка лежит поверх) */
+.tab.tab-new .x{animation:fadeIn calc(.3s * var(--ak)) calc(.38s * var(--ak)) backwards}
+
+/* --- тема «Свой цвет»: все кнопки — один выбранный цвет (--accent), нижний бар и его эффекты берут его же через --fx1..3 --- */
+html.th-custom .stop{background:var(--accent);color:var(--accent-t)}
+html.th-custom .chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-t)}
+html.th-custom .badge{background:var(--accent);color:var(--accent-t)}
+html.th-custom .nav button.active{color:var(--text)}
+html.th-custom .step,html.th-custom .lev{border-color:var(--accent)}
+html.th-custom .lev{color:var(--accent)}
+html.th-custom .tab.add{color:var(--accent)}
+.theme-pick{display:flex;gap:12px;padding:6px 2px 12px}
+.theme-pick label{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.theme-pick input[type=color]{-webkit-appearance:none;appearance:none;width:100%;height:52px;padding:0;border:2px solid var(--border2);border-radius:14px;background:none;cursor:pointer;overflow:hidden}
+.theme-pick input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+.theme-pick input[type=color]::-webkit-color-swatch{border:0;border-radius:12px}
+.theme-pick input[type=color]::-moz-color-swatch{border:0;border-radius:12px}
+
+/* --- круглые кнопки у графика: полупрозрачное «стекло», как у нижнего бара (степень прозрачности — --glass) --- */
+:root{--glass:42%}
+.round{background:rgba(110,110,110,.4);background:color-mix(in srgb,var(--round) var(--glass),transparent);
+  border:1px solid color-mix(in srgb,var(--round-t) 16%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.round.on{background:color-mix(in srgb,var(--accent) 60%,transparent);border-color:color-mix(in srgb,var(--accent-t) 22%,transparent)}
+
+/* подсказка арбитража (Ф+Ф / Ф+С) */
+.set-sub{padding-left:26px}
+.arb-tip{position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 52px);z-index:45;background:var(--sheet);border:1px solid var(--line);border-radius:12px;padding:8px 10px;box-shadow:0 6px 24px rgba(0,0,0,.45);max-width:520px;margin:0 auto}
+.arb-h{display:flex;align-items:center;gap:4px;font-size:14px}.arb-h b{flex:1}
+.arb-x{width:30px;height:28px;border-radius:8px;color:var(--muted);font-size:16px}
+.arb-step{display:flex;gap:10px;align-items:center;width:100%;text-align:left;padding:7px 8px;margin-top:6px;border-radius:10px;background:var(--card);border:1px solid var(--line);font-size:14px}
+.arb-step.here{border-color:var(--accent)}.arb-step.done{opacity:.6}.arb-step:disabled{opacity:.45}
+.arb-n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--card2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+.arb-step.done .arb-n{background:var(--accent);color:var(--accent-t)}
+.arb-t small{color:var(--muted)}
+.arb-f{margin-top:6px;font-size:12px;color:var(--muted);line-height:1.35}
+
+/* ===== Стакан и заявки (dom.js) ===== */
+.dom-btn{font-size:11px;font-weight:700;letter-spacing:.2px}
+#dom-view{position:fixed;inset:0;z-index:15;background:var(--bg);display:flex;flex-direction:column;align-items:center}
+#dom-view[hidden]{display:none}
+#dom-view>*{width:100%;max-width:560px}
+#dom-view:not([hidden]){animation:slideInR calc(.34s * var(--ak)) var(--e-pop)}
+#dom-view.ov-out{animation:slideOutR calc(.2s * var(--ak)) var(--e-in) forwards}
+html.fs #dom-view{padding-top:var(--safe-t)}
+.dom-top{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;padding:10px 8px 6px;flex:none}
+.dom-top>button{font-size:28px;line-height:1;height:40px}
+.dom-title{text-align:center;min-width:0}
+.dom-title b{display:block;font-size:20px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dom-title small{color:var(--muted);font-size:12px}
+.dom-ex{display:flex;align-items:center;justify-content:center;gap:2px}
+.dom-ex i{font-style:normal;font-size:16px;color:var(--muted)}
+.dom-bar{display:flex;gap:6px;padding:4px 10px 8px;align-items:stretch;flex:none}
+.dom-bar .step{width:40px;height:40px;font-size:20px}
+.dom-bar input{flex:1;min-width:0;text-align:center;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px;font-size:17px;font-weight:600;padding:6px}
+.dom-bar .lev{min-width:58px;border-radius:10px;background:var(--card);border:1px solid var(--line);font-size:16px;font-weight:700;color:#f5b301;padding:0 8px}
+.dom-bar .lev:disabled{opacity:.6}
+.dom-tap{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);position:relative;padding-left:4px}
+.dom-tap .spot-in{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.dom-tap .spot-sw{width:40px;height:24px;border-radius:12px}
+.dom-tap .spot-sw::after{width:18px;height:18px}
+.dom-tap .spot-in:checked+.spot-sw::after{transform:translateX(16px)}
+.dom-pos{display:flex;align-items:center;gap:8px;margin:0 10px 6px;padding:6px 10px;background:var(--card);border:1px solid var(--line);border-radius:10px;font-size:14px;flex:none}
+.dom-pos[hidden]{display:none}
+.dom-pos .dom-pnl{margin-left:auto;font-size:16px}
+.dom-pos .stop{font-size:14px;padding:6px 14px}
+.dom-lw{flex:1;min-height:0;position:relative;display:flex;flex-direction:column}
+.dom-ladder{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 10px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;font-variant-numeric:tabular-nums;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.dom-zoom{position:absolute;right:14px;bottom:8px;display:flex;gap:4px;padding:3px;background:color-mix(in srgb,var(--card) 88%,transparent);border:1px solid var(--line);border-radius:10px;backdrop-filter:blur(6px)}
+.dom-zoom button{min-width:32px;height:30px;padding:0 6px;font-size:16px;font-weight:700;border-radius:8px;color:var(--text)}
+.dom-zoom #dom-zv{font-size:13px;min-width:44px}
+.dom-err{text-align:center;color:var(--muted);padding:24px 16px;font-size:15px}
+.dr{position:relative;display:flex;align-items:center;gap:8px;flex:none;height:26px;padding:0 10px;border-radius:4px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.dr .bar{position:absolute;right:0;top:1px;bottom:1px;width:min(100%,calc(var(--w) * var(--xz,1) * 1%));border-radius:3px;pointer-events:none;transition:width calc(.18s * var(--ak))}
+.dr.ask .bar{background:color-mix(in srgb,var(--red) 28%,transparent)}
+.dr.bid .bar{background:color-mix(in srgb,var(--green) 30%,transparent)}
+.dr .px{position:relative;font-size:15px;font-weight:600;flex:none}
+.dr.ask .px{color:var(--red)} .dr.bid .px{color:var(--green)}
+.dr .qt{position:relative;margin-left:auto;font-size:13px;color:var(--text);opacity:.85}
+.dr .mk-c{position:relative;display:flex;gap:4px;min-width:0}
+.dr .mk{font-style:normal;font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;background:var(--text);color:var(--bg);white-space:nowrap}
+.dr .mk.up{background:var(--green);color:#fff} .dr .mk.dn{background:var(--red);color:#fff}
+.dr:active,.dr.sel{outline:1.5px solid var(--text);outline-offset:-1.5px}
+.dr.mid{cursor:default;justify-content:space-between;flex:none;height:36px;max-height:none;margin:3px 0;background:var(--card);border:1px solid var(--line);border-radius:8px}
+.dr.mid b{font-size:18px}
+.dr.mid span{font-size:12px}
+.dom-confirm{display:flex;align-items:center;gap:8px;margin:6px 10px 0;padding:8px 10px;background:var(--card2);border:1px solid var(--line);border-radius:12px;flex:none}
+.dom-confirm[hidden]{display:none}
+.dom-confirm>div{flex:1;min-width:0;font-size:14px}
+.dom-confirm small{display:block;color:var(--muted)}
+.dom-confirm .ok{background:var(--accent);color:var(--accent-t);border-radius:10px;font-weight:700;padding:10px 16px}
+.dom-confirm .no{background:var(--card);border:1px solid var(--line);border-radius:10px;width:40px;height:40px}
+.dom-orders{margin:6px 10px 0;background:var(--card);border:1px solid var(--line);border-radius:12px;flex:none}
+.dom-orders[hidden]{display:none}
+.do-head{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;font-size:13px}
+.do-head button{color:var(--red);font-size:13px;font-weight:600}
+.do-list{max-height:112px;overflow-y:auto;border-top:1px solid var(--line)}
+.do-row{display:flex;align-items:center;gap:10px;padding:6px 10px;font-size:14px;border-bottom:1px solid var(--line)}
+.do-row:last-child{border-bottom:0}
+.do-row small{color:var(--muted);margin-left:auto}
+.do-row button{width:32px;height:28px;border-radius:8px;background:var(--card2);font-size:14px}
+.dom-foot{display:flex;gap:12px;padding:8px 10px calc(10px + var(--safe-b));flex:none}
+.dom-foot .dir{height:50px;font-size:19px}
+.dom-foot .dir .ico{width:30px;height:30px;line-height:26px;font-size:17px}
+
+/* ===== Стакан (DOM): планшет, ноутбук, ПК, телефон горизонтально — две колонки ===== */
+/* слева стакан на всю высоту, справа ставка, позиция, заявки и кнопки; на узком портрете — прежняя одна колонка */
+@media (min-width:640px) and (orientation:portrait){
+  #dom-view>*{max-width:720px}
+}
+@media (min-width:640px) and (orientation:landscape), (min-width:1000px){
+  #dom-view:not([hidden]){display:grid;grid-template-columns:minmax(0,1fr) var(--dom-rp,clamp(300px,34vw,440px));
+    grid-template-rows:auto auto auto auto minmax(0,1fr) auto;align-items:stretch;justify-items:stretch;overflow:hidden}
+  #dom-view>*{max-width:none;width:auto}
+  #dom-view>.dom-top{grid-column:1;grid-row:1;justify-self:center;width:100%;max-width:760px}
+  #dom-view>.dom-lw{grid-column:1;grid-row:2/-1;padding-bottom:8px;contain:size;justify-self:center;width:100%;max-width:760px}
+  .dom-bar{grid-column:2;grid-row:1;padding:10px 14px 8px;flex-wrap:wrap}
+  .dom-bar input{flex:1 1 90px}
+  .dom-pos{grid-column:2;grid-row:2;margin:0 14px 6px}
+  .dom-confirm{grid-column:2;grid-row:3;margin:6px 14px 0}
+  .dom-orders{grid-column:2;grid-row:4;align-self:start;max-height:100%;overflow-y:auto;margin:6px 14px 0}
+  .dom-foot{grid-column:2;grid-row:6;padding:10px 14px calc(12px + var(--safe-b));flex-direction:column}
+  .dom-foot .dir{height:60px;font-size:20px;flex:none}
+  /* пустые ячейки правой колонки тоже получают линию-разделитель */
+  #dom-view::after{content:"";grid-column:2;grid-row:1/-1;border-left:1px solid var(--line);pointer-events:none;z-index:-1}
+  /* на широком экране строки стакана крупнее и читаются с мыши */
+  .dr{height:28px}
+  .dr .px{font-size:16px}
+  .dr .qt{font-size:14px}
+}
+@media (max-height:520px) and (orientation:landscape){
+  .dom-top{padding:4px 8px 2px}
+  .dom-top>button{height:32px;font-size:24px}
+  .dom-title b{font-size:16px}
+  .dom-bar{padding:6px 12px}
+  .dom-foot{flex-direction:row;padding:6px 12px calc(8px + var(--safe-b))}
+  .dom-foot .dir{height:44px;font-size:17px;flex:1 1 0}
+  .dr{height:24px}
+}
+
+/* ===== Крупные экраны: боковая панель и элементы чуть крупнее ===== */
+@media (min-width:1280px) and (min-height:700px){
+  .nav.nav{width:80px}
+  .nav.nav button{font-size:12px;padding:12px 0}
+  .nav.nav button span{font-size:22px}
+}
+
+/* ===== Стакан + график рядом (MetaScalp-стиль): на всех экранах — планшет, ПК, телефон (и горизонтально, и вертикально) ===== */
+#dom-view{--sw:12px}
+@media (pointer:coarse){#dom-view{--sw:28px}}
+.dom-chartbox{display:block;flex:1 1 0;min-width:0;position:relative;overflow:hidden;border-right:1px solid var(--line)}
+#dom-chart{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none;cursor:grab}
+#dom-chart:active{cursor:grabbing}
+.dom-ladder{position:relative}
+.dom-tfs{position:absolute;left:6px;top:6px;display:flex;gap:4px;z-index:2}
+.dom-tfs button{height:26px;padding:0 8px;font-size:12px;font-weight:700;border-radius:8px;color:var(--muted);background:rgba(31,34,39,.85);background:color-mix(in srgb,var(--card) 85%,transparent);border:1px solid var(--line)}
+.dom-tfs button.on{color:var(--text);border-color:var(--text)}
+#dom-view>.dom-top{max-width:none;justify-self:stretch}
+#dom-view>.dom-lw{max-width:none;justify-self:stretch;flex-direction:row;padding-bottom:44px}
+.dom-lw>.dom-ladder{flex:0 0 clamp(120px,var(--dom-lw,46%),72%);padding:0 2px;min-width:0}
+/* панель кнопок — внизу слева над графиком, чтобы не закрывать объёмы в стакане */
+.dom-zoom{left:6px;right:auto;bottom:6px;flex-direction:column;gap:3px;padding:3px;z-index:3}
+.dom-zoom .zg{display:flex;align-items:center;gap:3px}
+.dom-zoom .zg small{margin-left:3px;font-size:10px;color:var(--muted);white-space:nowrap}
+.dom-zoom button{min-width:34px;height:28px;padding:0 4px;font-size:15px}
+.dom-zoom #dom-zv{font-size:12px;min-width:38px}
+/* плотные строки: объём слева, цена справа */
+.dr{height:var(--rh,20px);padding:0 6px;gap:6px;border-radius:2px}
+.dr .bar{left:0;right:auto;top:0;bottom:0;border-radius:0;transition:none;z-index:0}
+.dr .qt{order:1;margin-left:0;font-size:12px;opacity:1;min-width:40px;z-index:1}
+.dr .mk-c{order:2;flex:1}
+.dr .px{order:3;margin-left:auto;font-size:13px;z-index:1}
+.dr.mid{height:26px;margin:2px 0;padding:0 8px}
+.dr.mid b{font-size:15px}
+.dr.mid span{font-size:11px}
+/* строки целиком слегка подкрашены, объём — яркая полоса, крупные уровни («стены») — оранжевые, как в MetaScalp.
+   Сначала обычный rgba (работает на любом WebView), следом color-mix (подхватит тему) */
+.dr.ask{background:rgba(224,53,0,.07);background:color-mix(in srgb,var(--red) 7%,transparent)}
+.dr.bid{background:rgba(46,158,58,.08);background:color-mix(in srgb,var(--green) 8%,transparent)}
+.dr.ask .bar{background:rgba(224,53,0,.5);background:color-mix(in srgb,var(--red) 55%,transparent)}
+.dr.bid .bar{background:rgba(46,158,58,.5);background:color-mix(in srgb,var(--green) 55%,transparent)}
+.dr .bar.big{background:rgba(245,158,11,.85);background:color-mix(in srgb,#f59e0b 85%,transparent)}
+.dr .qt{text-shadow:0 0 3px var(--bg),0 0 3px var(--bg)}
+.dr.ask:not(.sel):hover .qt,.dr.bid:not(.sel):hover .qt{text-decoration:underline}
+.dr.big .px,.dr.big .qt{color:#111 !important;text-shadow:none !important;font-weight:700}
+/* заголовок «КУПИТЬ / ПРОДАТЬ»; кнопки Вверх/Вниз не нужны — торгуем тапом по стакану */
+.dom-hd{display:flex;position:sticky;top:0;z-index:3;height:18px;margin:0 -2px;background:var(--bg);font-size:10px;font-weight:700;letter-spacing:.6px;border-bottom:1px solid var(--line)}
+.dom-hd span{flex:1;display:flex;align-items:center;padding:0 8px}
+.dom-hd span:first-child{color:var(--green)} .dom-hd span:last-child{color:var(--red);justify-content:flex-end}
+.dom-foot{display:none}
+/* разделители окон (тянутся мышью/пальцем) */
+.dom-split{display:block;flex:none;width:var(--sw);margin:0 calc(var(--sw) / -2);position:relative;z-index:4;cursor:col-resize;touch-action:none;-webkit-tap-highlight-color:transparent}
+.dom-split::after{content:"";position:absolute;left:calc(var(--sw) / 2 - 1px);top:0;bottom:0;width:2px;background:var(--line);transition:background .15s}
+@media (hover:hover){.dom-split:hover::after{background:var(--muted)}}
+.dom-split.drag::after{background:var(--text)}
+.dom-split.v2{display:none}
+@media (min-width:640px) and (orientation:landscape){
+  .dom-lw>.dom-ladder{flex:0 0 clamp(120px,var(--dom-lw,clamp(250px,30%,360px)),72%)}
+  #dom-view>.dom-split.v2{display:block;position:absolute;top:0;bottom:0;margin:0;width:var(--sw);max-width:var(--sw);right:calc(var(--dom-rp,clamp(300px,34vw,440px)) - var(--sw) / 2);z-index:6}
+  .dom-orders{grid-row:4}
+}
+/* узкие экраны (телефон): стакан компактнее */
+@media (max-width:639px),(orientation:portrait){
+  .dr .px{font-size:12px}
+  .dr .qt{font-size:11px;min-width:34px}
+  .dr.mid{padding:0 5px}
+  .dr.mid b{font-size:13px}
+  .dr.mid span{font-size:10px}
+  .dom-top>button{height:36px}
+}
+@media (max-width:480px){.dr.mid span{display:none}}
+@media (max-height:520px){
+  .dom-zoom{flex-direction:row;flex-wrap:wrap;max-width:132px}
+  .dom-zoom .zg{display:contents}
+  .dom-zoom .zg small{display:none}
+  .dom-zoom button{min-width:30px;height:26px}
+}
+
+.dr.has-mk{box-shadow:inset 0 0 0 1.5px var(--text)}
+.dr .mk{font-size:12px;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+
+.dr .mk-c{position:static;justify-content:center}
+.dr .pos+*{}
+
+/* нижняя плашка как в MetaScalp: цена монеты | сумма позиции | комиссия и funding */
+.dom-plate{position:absolute;left:0;right:0;bottom:0;height:44px;display:flex;z-index:6;background:#0d1016;border-top:1px solid var(--line)}
+.dom-plate b{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;color:#fff;white-space:nowrap}
+.dom-plate .pl-px{background:#0d1016}
+.dom-plate .pl-sz{background:#1b1e25;color:var(--muted)}
+.dom-plate .pl-fee{background:#1b1e25;color:var(--muted)}
+.dom-plate .pl-fee.neg{background:rgba(168,72,80,.92);color:#fff}
+.dom-plate .pl-fee.pos{background:rgba(70,140,82,.92);color:#fff}
+.dom-plate.s-wait .pl-sz{box-shadow:inset 0 0 0 2px currentColor}
+.dom-plate.s-wait.up .pl-sz{color:#4cd964} .dom-plate.s-wait.dn .pl-sz{color:#ff6a4d}
+.dom-plate.s-lit.up .pl-sz{background:rgba(76,140,86,.95);color:#fff;box-shadow:inset 0 0 14px rgba(120,255,150,.35)}
+.dom-plate.s-lit.dn .pl-sz{background:rgba(168,72,80,.95);color:#fff;box-shadow:inset 0 0 14px rgba(255,130,120,.35)}
+.dom-plate.fresh .pl-sz{animation:posflash .5s ease-out 3}
+@keyframes posflash{0%,100%{filter:none}50%{filter:brightness(1.9)}}
+@media (max-width:480px){.dom-plate b{font-size:15px}.dom-plate{height:38px}#dom-view>.dom-lw{padding-bottom:38px}}
+/* цены в стакане нейтральные, строки без заливки — цвет только у полос объёма (как в MetaScalp) */
+.dr.ask,.dr.bid{background-color:transparent}
+.dr.ask .px,.dr.bid .px{color:var(--text)}
+.dom-zoom{bottom:52px}
+@media (max-width:480px){.dom-zoom{bottom:46px}}
+
+.dom-bar{flex-wrap:wrap}
+.dom-bar #dom-tpsl-set{width:36px;font-size:17px}
+
+/* ===== v98: компактная шапка стакана (широкий режим) + чёткость стакана ===== */
+/* Раньше шапка (название монеты) и панель ставки лежали в ОДНОЙ строке сетки: панель в три ряда кнопок раздувала строку, а шапка слева растягивалась до её высоты —
+   получалась пустая полоса в треть экрана, а график со стаканом сжимались. Теперь шапка — тонкая полоса поверх первой строки, график и стакан начинаются сразу под ней. */
+@media (min-width:640px) and (orientation:landscape), (min-width:1000px){
+  #dom-view{--dom-hh:36px}
+  #dom-view>.dom-top{align-self:start;height:var(--dom-hh);padding:2px 8px;z-index:5;background:var(--bg)}
+  #dom-view>.dom-top>button{height:32px;font-size:24px}
+  #dom-view>.dom-lw{grid-row:1/-1;padding-top:var(--dom-hh)}
+  .dom-title{display:flex;align-items:baseline;justify-content:center;gap:8px;min-width:0;white-space:nowrap}
+  .dom-title b{display:inline;font-size:16px;flex:none}
+  .dom-title small{font-size:12px;overflow:hidden;text-overflow:ellipsis}
+}
+/* цифры стакана: моноширинные, сглаженные, с лёгкой тенью — читаются поверх цветных полос */
+.dr .px,.dr .qt,.dr.mid b,.dom-plate b{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.dr .qt{opacity:.95;font-weight:600;text-shadow:0 1px 1px rgba(0,0,0,.5)}
+.dr.big .qt{color:#fff}
+
+/* ввод цвета кодом в теме «Свой цвет» */
+.theme-pick .hex-in{width:100%;box-sizing:border-box;height:40px;padding:0 8px;text-align:center;font:600 15px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.5px;text-transform:lowercase;color:var(--text);background:var(--card);border:1.5px solid var(--border2);border-radius:12px;outline:none}
+.theme-pick .hex-in:focus{border-color:var(--text)}
+.theme-pick .hex-in.bad{border-color:#e03500;color:#ff7a5c}
+
+/* ===== Стакан как в MetaScalp (v113): сплошная сетка цен без строки «mid», заливка сторон, яркие лучшие ask/bid ===== */
+.dom-ladder{padding:0}
+.dr{padding:0;gap:0;border-radius:0;font-size:12px;line-height:1;background-color:transparent}
+.dr.ask{background-color:rgba(224,53,0,.38);background-color:color-mix(in srgb,var(--red) 40%,var(--bg))}
+.dr.bid{background-color:rgba(46,158,58,.34);background-color:color-mix(in srgb,var(--green) 34%,var(--bg))}
+.dr.gap{background-color:transparent}
+.dr.best.bestA{background-color:rgba(236,86,60,.66);background-color:color-mix(in srgb,var(--red) 62%,#ffffff 8%)}
+.dr.best.bestB{background-color:rgba(76,160,86,.66);background-color:color-mix(in srgb,var(--green) 62%,#ffffff 8%)}
+.dr.gap.zone{background-color:rgba(232,70,40,.9);background-color:color-mix(in srgb,var(--red) 88%,#ffffff 6%)}
+.dr .qt{flex:1 1 auto;min-width:0;padding-left:4px;text-align:left;color:var(--text);text-shadow:none;font-weight:500}
+.dr .mk-c{flex:none;order:2;padding-right:4px}
+.dr .px{flex:none;width:44%;max-width:46%;margin-left:0;padding-right:6px;text-align:right;color:var(--text) !important;font-weight:500;border-left:1px solid rgba(255,255,255,.14);align-self:stretch;display:flex;align-items:center;justify-content:flex-end;background:rgba(0,0,0,.08)}
+.dr.big .px{color:var(--text) !important}
+.dr.big .qt{color:#111 !important}
+.dr.sel,.dr:active{outline:1px solid #fff;outline-offset:-1px}
+.dr.has-mk{box-shadow:inset 0 0 0 1px #f59e0b}
+
+.dom-ladder .dr.tapflash{box-shadow:inset 0 0 0 2px #f59e0b;}
