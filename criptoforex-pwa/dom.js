@@ -630,7 +630,7 @@ function domChartDraw() {
 // ---------------------------------------------------------------- плавающий график поверх стакана
 // Кнопка 📈 в панели слева внизу. Окно двигается за заголовок, высота — за нижнюю границу, ширина и высота — за правый нижний угол.
 // Положение и размер запоминаются (отдельно для горизонтали и вертикали). Данные: свечи биржи + живая цена стакана.
-const FC = { on: false, x: 0, y: 0, w: 0, h: 0, tf: "1", candles: [], key: "", at: 0, busy: false };
+const FC = { on: false, x: 0, y: 0, w: 0, h: 0, tf: "1", candles: [], key: "", at: 0, busy: false, cw: 7, pan: 0 };
 function domFcInit() {
   const box = $("dom-fc"), lw = document.querySelector(".dom-lw"), head = $("dom-fc-head");
   const land = () => window.matchMedia("(min-width:640px) and (orientation:landscape)").matches;
@@ -649,10 +649,10 @@ function domFcInit() {
     FC.h ? s.setProperty("--fc-h", FC.h + "px") : s.removeProperty("--fc-h");
     domFcDraw();
   };
-  const save = () => domLs(kk(), JSON.stringify({ on: FC.on, x: FC.x, y: FC.y, w: FC.w, h: FC.h, tf: FC.tf }));
+  const save = () => domLs(kk(), JSON.stringify({ on: FC.on, x: FC.x, y: FC.y, w: FC.w, h: FC.h, tf: FC.tf, cw: FC.cw }));
   const load = () => {
     let o = null; try { o = JSON.parse(domLs(kk()) || "null"); } catch (e) {}
-    Object.assign(FC, { x: 0, y: 0, w: 0, h: 0 }, o && typeof o === "object" ? { on: !!o.on, x: +o.x || 0, y: +o.y || 0, w: +o.w || 0, h: +o.h || 0, tf: DOM_TF_SEC[o.tf] ? o.tf : "1" } : {});
+    Object.assign(FC, { x: 0, y: 0, w: 0, h: 0 }, o && typeof o === "object" ? { on: !!o.on, x: +o.x || 0, y: +o.y || 0, w: +o.w || 0, h: +o.h || 0, tf: DOM_TF_SEC[o.tf] ? o.tf : "1", cw: Math.max(2, Math.min(30, +o.cw || 7)) } : {});
     box.hidden = !FC.on; $("dom-fc-btn").classList.toggle("on", FC.on); domFcTfSync(); if (FC.on) requestAnimationFrame(apply);
   };
   domFcInit.load = load; domFcInit.apply = apply;
@@ -692,6 +692,31 @@ function domFcInit() {
   window.addEventListener("resize", () => { if (FC.on && DOM.open) requestAnimationFrame(apply); });
   const mq = window.matchMedia("(min-width:640px) and (orientation:landscape)");
   (mq.addEventListener ? mq.addEventListener("change", load) : mq.addListener(load));
+  // внутри графика: палец/мышь — прокрутка по времени, щипок / колесо — масштаб свечей, двойной тап — к текущей цене
+  { const cv = $("dom-fc-cv"), ptr = new Map(); let pz = null, p0 = null, moved = false, lastTap = 0;
+    const cl = (v) => Math.max(2, Math.min(30, v));
+    cv.addEventListener("pointerdown", (e) => {
+      ptr.set(e.pointerId, { x: e.clientX, y: e.clientY }); try { cv.setPointerCapture(e.pointerId); } catch (x) {}
+      if (ptr.size === 2) { const [p, q] = [...ptr.values()]; pz = { d: Math.hypot(p.x - q.x, p.y - q.y) || 1, cw: FC.cw }; p0 = null; }
+      else { pz = null; moved = false; p0 = { x: e.clientX, pan: FC.pan }; }
+    });
+    cv.addEventListener("pointermove", (e) => {
+      if (!ptr.has(e.pointerId)) return; ptr.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptr.size === 2 && pz) { const [p, q] = [...ptr.values()]; FC.cw = cl(pz.cw * Math.hypot(p.x - q.x, p.y - q.y) / pz.d); moved = true; domFcDraw(); }
+      else if (ptr.size === 1 && p0) { const dx = e.clientX - p0.x; if (Math.abs(dx) > 3) moved = true; FC.pan = Math.max(0, p0.pan + dx / FC.cw); domFcDraw(); }
+    });
+    const end = (e) => {
+      ptr.delete(e.pointerId); if (ptr.size < 2) pz = null;
+      if (!ptr.size) { if (!moved) { const n = Date.now(); if (n - lastTap < 350) { lastTap = 0; FC.pan = 0; domFcDraw(); } else lastTap = n; } else save(); p0 = null; }
+    };
+    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+    cv.addEventListener("wheel", (e) => { e.preventDefault(); FC.cw = cl(FC.cw * Math.exp(-e.deltaY * 0.002)); domFcDraw(); save(); }, { passive: false });
+  }
+  // панель «строки / шаг цены / график / к цене»: сворачивается кнопкой ⌄
+  { const z = $("dom-zoom"), hb = $("dom-zhide");
+    const setMin = (m) => { z.classList.toggle("min", m); hb.textContent = m ? "⚙" : "⌄"; hb.title = m ? "Показать панель" : "Скрыть панель"; domLs("domZoomMin", m ? "1" : null); };
+    hb.onclick = () => setMin(!z.classList.contains("min"));
+    setMin(domLs("domZoomMin") === "1"); }
   load();
 }
 function domFcTfSync() { document.querySelectorAll("#dom-fc-tfs [data-ftf]").forEach((b) => b.classList.toggle("on", b.dataset.ftf === FC.tf)); }
@@ -722,29 +747,40 @@ function domFcDraw() {
   const cs = FC.candles; if (cs.length < 2) { ctx.fillStyle = "#8b9099"; ctx.font = "12px sans-serif"; ctx.textAlign = "center"; ctx.fillText("Загрузка графика…", W / 2, H / 2); return; }
   const st = getComputedStyle(document.documentElement), col = (n, f) => (st.getPropertyValue(n) || f).trim() || f;
   const line = col("--line", "#2e3239"), muted = col("--muted", "#888"), text = col("--text", "#fff"), bg = col("--bg", "#16181d");
-  const dec = a ? a.decimals : 2, padR = 62, padB = 6, padT = 6, cw = W - padR, ch = H - padT - padB;
-  const step = Math.max(2, cw / Math.min(cs.length, Math.max(20, Math.floor(cw / 4))));     // ~4px на свечу; ширину окна заполняем последними свечами
-  const n = Math.min(cs.length, Math.floor(cw / step)), vis = cs.slice(-n);
-  let lo = Infinity, hi = -Infinity; vis.forEach((c) => { lo = Math.min(lo, c.low != null ? c.low : c.close); hi = Math.max(hi, c.high != null ? c.high : c.close); });
+  const dec = a ? a.decimals : 2, padR = 62, padB = 6, padT = 6, cw = W - padR, ch = H - padT - padB, k = FC.cw;
+  // видимые свечи: справа налево, со сдвигом FC.pan (в свечах); крайняя правая — самая свежая (живая)
+  const n = Math.max(2, Math.floor(cw / k)), pan = Math.max(0, Math.min(cs.length - 3, Math.round(FC.pan))), endI = cs.length - pan;
+  const vis = cs.slice(Math.max(0, endI - n), endI);
+  let lo = Infinity, hi = -Infinity; vis.forEach((c) => { lo = Math.min(lo, c.low); hi = Math.max(hi, c.high); });
   if (!(hi > lo)) { hi = lo * 1.0005; lo = lo * 0.9995; }
   const m = (hi - lo) * 0.08; lo -= m; hi += m;
-  const Y = (p) => padT + (hi - p) / (hi - lo) * ch, X = (i) => cw - (n - 1 - i) * step - 2;
+  const Y = (p) => padT + (hi - p) / (hi - lo) * ch, X = (i) => cw - (vis.length - 1 - i) * k - k / 2 - 1;
+  // сетка и шкала цен
   ctx.lineWidth = 1; ctx.strokeStyle = line; ctx.globalAlpha = 0.6; ctx.fillStyle = muted; ctx.font = "10px sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
   ctx.beginPath(); for (let g = 0; g <= 4; g++) { const y = Math.round(padT + ch * g / 4) + 0.5; ctx.moveTo(0, y); ctx.lineTo(cw, y); } ctx.stroke(); ctx.globalAlpha = 1;
   for (let g = 0; g <= 4; g++) ctx.fillText((hi - (hi - lo) * g / 4).toFixed(dec), cw + 4, Math.min(H - 6, Math.max(7, padT + ch * g / 4)));
-  const up = vis[vis.length - 1].close >= vis[0].close, c1 = up ? COLOR_UP : COLOR_DOWN;
-  // заливка под линией и сама линия цены закрытия
-  ctx.beginPath(); vis.forEach((c, i) => (i ? ctx.lineTo(X(i), Y(c.close)) : ctx.moveTo(X(i), Y(c.close))));
-  ctx.strokeStyle = c1; ctx.lineWidth = 1.8; ctx.lineJoin = "round"; ctx.stroke();
-  ctx.lineTo(X(n - 1), padT + ch); ctx.lineTo(X(0), padT + ch); ctx.closePath(); ctx.globalAlpha = 0.14; ctx.fillStyle = c1; ctx.fill(); ctx.globalAlpha = 1;
+  // свечи
+  const bw = Math.max(1, Math.floor(k * 0.72)), wickW = k >= 5 ? 1.2 : 1;
+  vis.forEach((c, i) => {
+    const x = X(i), up = c.close >= c.open, color = up ? COLOR_UP : COLOR_DOWN;
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = wickW;
+    ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, Y(c.high)); ctx.lineTo(Math.round(x) + 0.5, Y(c.low)); ctx.stroke();
+    const y1 = Y(Math.max(c.open, c.close)), y2 = Y(Math.min(c.open, c.close));
+    ctx.fillRect(Math.round(x - bw / 2), y1, bw, Math.max(1, y2 - y1));
+  });
   // текущая цена: пунктир + плашка справа
-  const last = vis[vis.length - 1].close, yl = Math.round(Y(last)) + 0.5;
-  ctx.setLineDash([4, 3]); ctx.strokeStyle = text; ctx.globalAlpha = 0.7; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, yl); ctx.lineTo(cw, yl); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
-  const label = last.toFixed(dec); ctx.font = "bold 11px sans-serif"; const tw = ctx.measureText(label).width + 8;
-  ctx.fillStyle = text; ctx.fillRect(cw + 1, yl - 8, Math.min(tw, padR - 1), 16); ctx.fillStyle = bg; ctx.textAlign = "left"; ctx.fillText(label, cw + 5, yl);
+  const last = cs[cs.length - 1].close;
+  if (last >= lo && last <= hi) {
+    const yl = Math.round(Y(last)) + 0.5;
+    ctx.setLineDash([4, 3]); ctx.strokeStyle = text; ctx.globalAlpha = 0.7; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, yl); ctx.lineTo(cw, yl); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const label = last.toFixed(dec); ctx.font = "bold 11px sans-serif"; const tw = ctx.measureText(label).width + 8;
+    ctx.fillStyle = text; ctx.fillRect(cw + 1, yl - 8, Math.min(tw, padR - 1), 16); ctx.fillStyle = bg; ctx.textAlign = "left"; ctx.fillText(label, cw + 5, yl);
+  }
   // открытые позиции по этому активу: линия входа
   (S.trades || []).filter((t) => t.asset === DOM.asset && t.entry_price >= lo && t.entry_price <= hi).forEach((t) => {
     const y = Math.round(Y(t.entry_price)) + 0.5; ctx.setLineDash([2, 3]); ctx.strokeStyle = t.direction === "up" ? COLOR_UP : COLOR_DOWN; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke(); ctx.setLineDash([]);
   });
+  // если график прокручен в прошлое — подсказка
+  if (pan > 0) { ctx.fillStyle = muted; ctx.font = "10px sans-serif"; ctx.textAlign = "left"; ctx.fillText("двойной тап — к текущей цене", 6, H - 10); }
 }

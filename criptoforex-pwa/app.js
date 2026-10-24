@@ -343,6 +343,13 @@ function resolveTheme(id) {
     text: p.text_color || (dark ? "#fff" : "#000"), muted: p.hint_color || "#8b9099", sheet: p.bg_color, pop: p.section_bg_color || card,
     border2: "rgba(128,128,128,.5)", inv: p.text_color || (dark ? "#fff" : "#000"), invT: p.bg_color, toast: p.text_color || "#333", toastT: p.bg_color } };
 }
+// Цвет статус-бара. Chrome/Android перечитывает theme-color, только если элемент изменился — поэтому пересоздаём мета-тег целиком;
+// вызываем при смене темы, при возврате в приложение и несколько раз после запуска (на холодном старте Android иначе показывает серый цвет манифеста)
+function paintStatusBar() {
+  const bg = (S && S.themeBg) || "#16181d", old = document.getElementById("meta-theme");
+  const m = document.createElement("meta"); m.name = "theme-color"; m.id = "meta-theme"; m.content = bg;
+  if (old) old.replaceWith(m); else document.head.appendChild(m);
+}
 function applyTheme(id, redraw) {
   if (!THEMES[id]) id = "default";
   const th = resolveTheme(id), v = th.v, st = document.documentElement.style;
@@ -371,10 +378,10 @@ function applyTheme(id, redraw) {
   try { localStorage.setItem("theme", id); } catch (e) {}
   // статус-бар / системная панель: красим под фон темы (Chrome/Android, Safari, Telegram)
   try {
-    const mt = document.getElementById("meta-theme"), ms = document.getElementById("meta-scheme");
-    if (mt) mt.setAttribute("content", v.bg);
-    if (ms) ms.setAttribute("content", th.dark ? "dark" : "light");
+    localStorage.setItem("themeBg", v.bg);
+    const ms = document.getElementById("meta-scheme"); if (ms) ms.setAttribute("content", th.dark ? "dark" : "light");
     document.documentElement.style.backgroundColor = v.bg;
+    paintStatusBar();
   } catch (e) {}
   if (tg) { try { tg.setHeaderColor(v.bg); tg.setBackgroundColor(v.bg); } catch (e) {} }
   if (redraw) {
@@ -386,6 +393,10 @@ function applyTheme(id, redraw) {
 }
 
 try { applyTheme(localStorage.getItem("theme") || "default"); } catch (e) {}   // сразу при загрузке, без мигания
+window.addEventListener("pageshow", () => paintStatusBar());
+window.addEventListener("focus", () => paintStatusBar());
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { paintStatusBar(); setTimeout(paintStatusBar, 400); } });
+window.addEventListener("load", () => { [200, 800, 2000, 4000].forEach((t) => setTimeout(paintStatusBar, t)); });
 if (tg && tg.onEvent) tg.onEvent("themeChanged", () => { if (S.theme === "telegram") applyTheme("telegram", true); });
 
 function renderTV(force) {
@@ -2091,18 +2102,39 @@ function showPage(name) {
   if (from !== name && animOn()) slidePages(S.page, name, swap, heavy); else { slideFinish(); swap(); heavy(); }
 }
 let anKey = "";
+function anCfg(id, a, dark, bg) {
+  return id === "tv-technical"
+    ? ["embed-widget-technical-analysis.js", { interval: "5m", width: "100%", height: "100%", isTransparent: false, backgroundColor: bg, symbol: a.tv, showIntervalTabs: true,
+        displayMode: "single", locale: "ru", colorTheme: dark ? "dark" : "light" }]
+    : ["embed-widget-events.js", { colorTheme: dark ? "dark" : "light", isTransparent: false, backgroundColor: bg, width: "100%", height: "100%", locale: "ru",
+        importanceFilter: "-1,0,1", countryFilter: "us,eu,gb,jp,ru" }];
+}
+function anMount(id, a, dark, bg) {
+  const box = $(id); box.style.colorScheme = dark ? "dark" : "light";       // схема iframe = схема виджета, иначе браузер закрашивает его белым
+  const [script, cfg] = anCfg(id, a, dark, bg); mountTV(box, script, cfg);
+}
 function renderAnalytics(force) {
   const a = assetById(S.asset); $("an-asset").textContent = "Технический анализ · " + a.name;
-  const dark = S.chartTheme !== "light", key = a.tv + "|" + (dark ? "d" : "l") + "|" + (S.themeBg || "");
+  const dark = S.chartTheme !== "light", bg = /^#[0-9a-f]{6}$/i.test(S.themeBg || "") ? S.themeBg : (dark ? "#16181d" : "#ffffff");
+  const key = a.tv + "|" + (dark ? "d" : "l") + "|" + bg;
   if (!force && anKey === key) return;         // виджеты уже загружены для этого актива и темы — открываем мгновенно
   anKey = key;
-  // isTransparent: виджет прозрачный и показывает фон приложения (var(--bg)), а не собственный серый/белый
-  mountTV($("tv-technical"), "embed-widget-technical-analysis.js", {
-    interval: "5m", width: "100%", height: "100%", isTransparent: true, symbol: a.tv, showIntervalTabs: true,
-    displayMode: "single", locale: "ru", colorTheme: dark ? "dark" : "light" });
-  mountTV($("tv-events"), "embed-widget-events.js", {
-    colorTheme: dark ? "dark" : "light", isTransparent: true, width: "100%", height: "100%", locale: "ru",
-    importanceFilter: "-1,0,1", countryFilter: "us,eu,gb,jp,ru" });
+  anMount("tv-technical", a, dark, bg); anMount("tv-events", a, dark, bg);
+  anWatch(key, 0);
+}
+// TradingView иногда не отдаёт виджет (сеть, блокировка, гонка двойной загрузки): через 6 с проверяем, что iframe появился; нет — перезагружаем, потом показываем подсказку
+function anWatch(key, n) {
+  clearTimeout(anWatch.t);
+  anWatch.t = setTimeout(() => {
+    if (anKey !== key) return;
+    const a = assetById(S.asset); if (!a) return;
+    const dark = S.chartTheme !== "light", bg = /^#[0-9a-f]{6}$/i.test(S.themeBg || "") ? S.themeBg : (dark ? "#16181d" : "#ffffff");
+    const miss = ["tv-technical", "tv-events"].filter((id) => !$(id).querySelector("iframe"));
+    document.querySelectorAll("#page-analytics .an-fail").forEach((x) => x.remove());
+    if (!miss.length) return;
+    if (n < 2) { miss.forEach((id) => anMount(id, a, dark, bg)); anWatch(key, n + 1); return; }
+    miss.forEach((id) => { const d = document.createElement("div"); d.className = "an-fail"; d.textContent = "Виджет TradingView не загрузился. Проверь интернет (или VPN) и нажми ⟳ сверху."; $(id).appendChild(d); });
+  }, 6000);
 }
 
 // ---------------------------------------------------------------- тейк-профит / стоп-лосс (как в TradingView)
@@ -2450,7 +2482,7 @@ function bindAnalyticsRefresh() {
   const b = $("an-refresh"); if (!b) return;
   b.onclick = () => {
     b.classList.add("spin"); setTimeout(() => b.classList.remove("spin"), AKs(900));
-    anKey = ""; renderAnalytics(true);
+    anKey = ""; document.querySelectorAll("#page-analytics .an-fail").forEach((x) => x.remove()); renderAnalytics(true);
   };
 }
 

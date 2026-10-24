@@ -34,3 +34,9 @@ The app needs to be opened once while online so Safari can install the service w
 ## v118
 
 - DOM screen: 📈 button (bottom-left panel) adds a floating price chart over the order book. Drag the header to move, drag the bottom edge to change height, drag the bottom-right corner to resize; double-tap resets. Position/size/timeframe are remembered.
+
+## v119
+
+- Status bar: theme colour is set in <head> before first paint from the saved theme and re-asserted on resume/focus/after load (Android relaunch showed the manifest grey).
+- Analytics: TradingView widgets are opaque again with the theme background and matching colour scheme; load watchdog retries and shows a hint if the widget fails to load.
+- DOM: floating chart is now candlesticks (drag to scroll, pinch/wheel to zoom, double-tap = latest). The tools panel (rows / price step / chart / to price) has a ⌄ button that collapses it.

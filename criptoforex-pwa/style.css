@@ -378,7 +378,7 @@ html.light #page-analytics{color-scheme:light}
 @keyframes anspin{to{transform:rotate(360deg)}}
 /* iframe виджетов: цветовая схема = схема приложения, иначе браузер закрашивает его сплошным белым/серым */
 #page-analytics .widget-box{background:var(--bg)}
-#page-analytics .widget-box iframe,#page-analytics .tradingview-widget-container{background:transparent;color-scheme:inherit}
+.an-fail{display:flex;align-items:center;justify-content:center;height:100%;padding:16px;text-align:center;color:var(--muted);font-size:14px}
 
 /* значки бирж */
 .eic{display:inline-flex;align-items:center;vertical-align:middle;flex:none;margin-right:6px}
@@ -981,3 +981,10 @@ html.fs #dom-view{padding-top:var(--safe-t)}
 .dom-fc-rc::after{content:"";position:absolute;right:4px;bottom:4px;width:10px;height:10px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);opacity:.8}
 .dom-fc.drag{box-shadow:0 0 0 2px var(--accent),0 6px 24px rgba(0,0,0,.45)}
 #dom-fc-btn.on{background:var(--accent);color:var(--accent-t)}
+
+/* панель «строки / шаг цены / график / к цене»: кнопка ⌄ сворачивает её до двух кнопок (⚙ — развернуть, 📈 — график) */
+.dom-zoom .zhd button{font-size:18px}
+.dom-zoom.min{padding:3px;gap:3px}
+.dom-zoom.min .zg:not(.zhd):not(.zfc){display:none}
+.dom-zoom.min .zhd small,.dom-zoom.min .zfc small{display:none}
+.dom-zoom.min .zhd button{font-size:15px}
