@@ -1,4 +1,4 @@
-const CACHE_NAME = "criptoforex-pwa-v119-1";
+const CACHE_NAME = "criptoforex-pwa-v121-1";
 const SHELL_FILES = [
   "./",
   "./index.html",

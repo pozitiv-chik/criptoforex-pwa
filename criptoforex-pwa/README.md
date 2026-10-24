@@ -40,3 +40,11 @@ The app needs to be opened once while online so Safari can install the service w
 - Status bar: theme colour is set in <head> before first paint from the saved theme and re-asserted on resume/focus/after load (Android relaunch showed the manifest grey).
 - Analytics: TradingView widgets are opaque again with the theme background and matching colour scheme; load watchdog retries and shows a hint if the widget fails to load.
 - DOM: floating chart is now candlesticks (drag to scroll, pinch/wheel to zoom, double-tap = latest). The tools panel (rows / price step / chart / to price) has a ⌄ button that collapses it.
+
+## v120
+
+- DOM: the floating chart can now be resized from any of its 4 edges and 4 corners, so width and height are adjusted independently (left/top edges move the window as well). Double-tap on a handle resets the size. Touch hit areas are larger on phones.
+
+## v121
+
+- DOM: the floating chart can be dragged anywhere on the DOM screen (including over the right-hand controls panel), not only over the order book. Saved position was reset (new storage key).

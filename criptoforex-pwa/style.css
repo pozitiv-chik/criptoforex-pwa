@@ -961,8 +961,8 @@ html.fs #dom-view{padding-top:var(--safe-t)}
 /* подсказки «?» выключены в настройках */
 .no-hints #hints,.no-hints #hint-pop,.no-hints .qm{display:none!important}
 
-/* --- плавающий график поверх стакана: двигается за заголовок, тянется за нижнюю границу и угол --- */
-.dom-fc{position:absolute;z-index:5;left:var(--fc-x,0px);top:var(--fc-y,0px);width:var(--fc-w,100%);height:var(--fc-h,190px);display:flex;flex-direction:column;
+/* --- плавающий график поверх стакана: двигается за заголовок, размер меняется за любую сторону и угол --- */
+.dom-fc{position:absolute;z-index:8;left:var(--fc-x,0px);top:var(--fc-y,0px);width:var(--fc-w,100%);height:var(--fc-h,190px);display:flex;flex-direction:column;
   background:color-mix(in srgb,var(--bg) 94%,transparent);border:1px solid var(--border2);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.45);overflow:hidden;touch-action:none}
 .dom-fc[hidden]{display:none}
 .dom-fc-head{flex:none;display:flex;align-items:center;gap:6px;height:30px;padding:0 4px 0 8px;background:var(--card);border-bottom:1px solid var(--line);cursor:grab;user-select:none;-webkit-user-select:none}
@@ -974,11 +974,25 @@ html.fs #dom-view{padding-top:var(--safe-t)}
 .dom-fc-tfs button.on{color:var(--text);border-color:var(--text)}
 .dom-fc-x{width:28px;height:26px;font-size:14px;color:var(--muted)}
 #dom-fc-cv{flex:1 1 0;min-height:0;width:100%;display:block;touch-action:none}
-/* нижняя граница — широкая зона захвата (28px на пальце), видна как короткая «ручка» */
-.dom-fc-rz{position:absolute;left:0;right:34px;bottom:0;height:var(--sw,14px);cursor:ns-resize;touch-action:none}
-.dom-fc-rz::after{content:"";position:absolute;left:50%;bottom:3px;width:44px;height:4px;margin-left:-22px;border-radius:2px;background:var(--muted);opacity:.7}
-.dom-fc-rc{position:absolute;right:0;bottom:0;width:34px;height:var(--sw,14px);cursor:nwse-resize;touch-action:none}
-.dom-fc-rc::after{content:"";position:absolute;right:4px;bottom:4px;width:10px;height:10px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);opacity:.8}
+/* ручки размера: 4 стороны и 4 угла; на пальце зоны шире. Кнопки в заголовке всегда выше ручек */
+.dom-fc{--rh:8px;--rc:18px}
+@media (pointer:coarse){.dom-fc{--rh:20px;--rc:34px}}
+.dom-fc-head button{position:relative;z-index:2}
+.dom-fc-h{position:absolute;z-index:1;touch-action:none;-webkit-tap-highlight-color:transparent}
+.dom-fc-h.n,.dom-fc-h.s{left:var(--rc);right:var(--rc);height:var(--rh);cursor:ns-resize}
+.dom-fc-h.w,.dom-fc-h.e{top:var(--rc);bottom:var(--rc);width:var(--rh);cursor:ew-resize}
+.dom-fc-h.n{top:0;height:min(var(--rh),8px)}.dom-fc-h.s{bottom:0}.dom-fc-h.w{left:0}.dom-fc-h.e{right:0}
+.dom-fc-h.nw,.dom-fc-h.ne,.dom-fc-h.sw,.dom-fc-h.se{width:var(--rc);height:var(--rc)}
+.dom-fc-h.nw{top:0;left:0;cursor:nwse-resize;height:min(var(--rc),12px)}
+.dom-fc-h.ne{top:0;right:0;cursor:nesw-resize;height:min(var(--rc),12px)}
+.dom-fc-h.sw{bottom:0;left:0;cursor:nesw-resize}
+.dom-fc-h.se{bottom:0;right:0;cursor:nwse-resize}
+/* видимые «ручки»: короткая полоска снизу и по бокам, уголок справа внизу */
+.dom-fc-h.s::after,.dom-fc-h.e::after,.dom-fc-h.w::after{content:"";position:absolute;border-radius:2px;background:var(--muted);opacity:.7}
+.dom-fc-h.s::after{left:50%;bottom:3px;width:44px;height:4px;margin-left:-22px}
+.dom-fc-h.e::after{right:3px;top:50%;height:44px;width:4px;margin-top:-22px}
+.dom-fc-h.w::after{left:3px;top:50%;height:44px;width:4px;margin-top:-22px}
+.dom-fc-h.se::after{content:"";position:absolute;right:4px;bottom:4px;width:10px;height:10px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);opacity:.8}
 .dom-fc.drag{box-shadow:0 0 0 2px var(--accent),0 6px 24px rgba(0,0,0,.45)}
 #dom-fc-btn.on{background:var(--accent);color:var(--accent-t)}
 

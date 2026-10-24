@@ -628,31 +628,34 @@ function domChartDraw() {
 }
 
 // ---------------------------------------------------------------- плавающий график поверх стакана
-// Кнопка 📈 в панели слева внизу. Окно двигается за заголовок, высота — за нижнюю границу, ширина и высота — за правый нижний угол.
-// Положение и размер запоминаются (отдельно для горизонтали и вертикали). Данные: свечи биржи + живая цена стакана.
+// Кнопка 📈 в панели слева внизу. Окно двигается за заголовок, размер (ширина и высота независимо) — за любую сторону и любой угол.
+// Окно можно увести в любую часть экрана (в т.ч. на правую панель). Положение и размер запоминаются (отдельно для горизонтали и вертикали). Данные: свечи биржи + живая цена стакана.
 const FC = { on: false, x: 0, y: 0, w: 0, h: 0, tf: "1", candles: [], key: "", at: 0, busy: false, cw: 7, pan: 0 };
 function domFcInit() {
-  const box = $("dom-fc"), lw = document.querySelector(".dom-lw"), head = $("dom-fc-head");
+  const box = $("dom-fc"), lw = document.querySelector(".dom-lw"), head = $("dom-fc-head"), view = $("dom-view");
+  view.appendChild(box);                                                                        // окно живёт во всём экране стакана, а не только над самим стаканом
   const land = () => window.matchMedia("(min-width:640px) and (orientation:landscape)").matches;
-  const kk = () => "domFc" + (land() ? "" : "P");
-  const bounds = () => ({ W: lw.clientWidth, H: Math.max(120, lw.clientHeight - 44) });         // снизу — плашка с ценой
+  const kk = () => "domFc2" + (land() ? "" : "P");
+  const bounds = () => ({ W: view.clientWidth, H: Math.max(120, view.clientHeight - 44) });     // весь экран; снизу — плашка с ценой
+  const home = () => ({ x: lw.offsetLeft, y: lw.offsetTop, w: lw.clientWidth });               // место по умолчанию — над стаканом
   const clamp = () => {
-    const { W, H } = bounds();
+    const { W, H } = bounds(), o = home();
     FC.w = FC.w ? Math.max(160, Math.min(W, FC.w)) : 0; FC.h = FC.h ? Math.max(90, Math.min(H, FC.h)) : 0;
-    const w = FC.w || W, h = FC.h || Math.min(190, Math.round(H * 0.4));
-    FC.x = Math.max(0, Math.min(W - w, FC.x)); FC.y = Math.max(0, Math.min(H - Math.min(h, H), FC.y));
+    const w = FC.w || Math.min(W, o.w || W), h = FC.h || Math.min(190, Math.round(H * 0.4));
+    const x = FC.x == null ? o.x : FC.x, y = FC.y == null ? o.y : FC.y;
+    FC.x = Math.max(0, Math.min(W - w, x)); FC.y = Math.max(0, Math.min(H - Math.min(h, H), y));
+    return w;
   };
   const apply = () => {
-    clamp(); const s = box.style;
-    s.setProperty("--fc-x", FC.x + "px"); s.setProperty("--fc-y", FC.y + "px");
-    FC.w ? s.setProperty("--fc-w", FC.w + "px") : s.removeProperty("--fc-w");
+    const w = clamp(); const s = box.style;
+    s.setProperty("--fc-x", FC.x + "px"); s.setProperty("--fc-y", FC.y + "px"); s.setProperty("--fc-w", w + "px");
     FC.h ? s.setProperty("--fc-h", FC.h + "px") : s.removeProperty("--fc-h");
     domFcDraw();
   };
   const save = () => domLs(kk(), JSON.stringify({ on: FC.on, x: FC.x, y: FC.y, w: FC.w, h: FC.h, tf: FC.tf, cw: FC.cw }));
   const load = () => {
     let o = null; try { o = JSON.parse(domLs(kk()) || "null"); } catch (e) {}
-    Object.assign(FC, { x: 0, y: 0, w: 0, h: 0 }, o && typeof o === "object" ? { on: !!o.on, x: +o.x || 0, y: +o.y || 0, w: +o.w || 0, h: +o.h || 0, tf: DOM_TF_SEC[o.tf] ? o.tf : "1", cw: Math.max(2, Math.min(30, +o.cw || 7)) } : {});
+    Object.assign(FC, { x: null, y: null, w: 0, h: 0 }, o && typeof o === "object" ? { on: !!o.on, x: o.x == null ? null : +o.x || 0, y: o.y == null ? null : +o.y || 0, w: +o.w || 0, h: +o.h || 0, tf: DOM_TF_SEC[o.tf] ? o.tf : "1", cw: Math.max(2, Math.min(30, +o.cw || 7)) } : {});
     box.hidden = !FC.on; $("dom-fc-btn").classList.toggle("on", FC.on); domFcTfSync(); if (FC.on) requestAnimationFrame(apply);
   };
   domFcInit.load = load; domFcInit.apply = apply;
@@ -672,7 +675,7 @@ function domFcInit() {
     el.addEventListener("pointerdown", (e) => {
       if (e.target.closest && e.target.closest("button")) return;
       e.preventDefault();
-      const x0 = e.clientX, y0 = e.clientY, s0 = { x: FC.x, y: FC.y, w: FC.w || bounds().W, h: FC.h || box.getBoundingClientRect().height };
+      const x0 = e.clientX, y0 = e.clientY, s0 = { x: box.offsetLeft, y: box.offsetTop, w: box.offsetWidth, h: box.offsetHeight };
       let moved = false;
       try { el.setPointerCapture(e.pointerId); } catch (x) {}
       box.classList.add("drag");
@@ -686,9 +689,21 @@ function domFcInit() {
       el.addEventListener("pointermove", mv); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
     });
   };
-  grab(head, (dx, dy, s0) => { FC.x = s0.x + dx; FC.y = s0.y + dy; }, () => { FC.x = 0; FC.y = 0; });
-  grab($("dom-fc-rz"), (dx, dy, s0) => { FC.h = s0.h + dy; if (!FC.w) FC.w = 0; }, () => { FC.h = 0; });
-  grab($("dom-fc-rc"), (dx, dy, s0) => { FC.w = s0.w + dx; FC.h = s0.h + dy; }, () => { FC.w = 0; FC.h = 0; });
+  grab(head, (dx, dy, s0) => { FC.x = s0.x + dx; FC.y = s0.y + dy; }, () => { FC.x = null; FC.y = null; });
+  // изменение размера за любую сторону и любой угол; левая/верхняя граница двигает окно, правая/нижняя — тянет
+  const MINW = 160, MINH = 90;
+  box.querySelectorAll("[data-rz]").forEach((el) => {
+    const d = el.dataset.rz;
+    grab(el, (dx, dy, s0) => {
+      const { W, H } = bounds(); let { x, y, w, h } = s0;
+      const minW = Math.min(MINW, W), minH = Math.min(MINH, H);
+      if (d.includes("e")) w = Math.max(minW, Math.min(W - x, s0.w + dx));
+      if (d.includes("w")) { const r = s0.x + s0.w; x = Math.max(0, Math.min(r - minW, s0.x + dx)); w = r - x; }
+      if (d.includes("s")) h = Math.max(minH, Math.min(H - y, s0.h + dy));
+      if (d.includes("n")) { const b = s0.y + s0.h; y = Math.max(0, Math.min(b - minH, s0.y + dy)); h = b - y; }
+      Object.assign(FC, { x, y, w, h });
+    }, () => { FC.w = 0; FC.h = 0; });
+  });
   window.addEventListener("resize", () => { if (FC.on && DOM.open) requestAnimationFrame(apply); });
   const mq = window.matchMedia("(min-width:640px) and (orientation:landscape)");
   (mq.addEventListener ? mq.addEventListener("change", load) : mq.addListener(load));

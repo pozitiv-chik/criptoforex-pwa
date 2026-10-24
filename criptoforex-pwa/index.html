@@ -24,7 +24,7 @@
     document.documentElement.classList.add("pwa-standalone");
   }
 </script>
-<link rel="stylesheet" href="./style.css?v=119-pwa">
+<link rel="stylesheet" href="./style.css?v=121-pwa">
 </head>
 <body>
 <div id="app">
@@ -120,7 +120,7 @@
       <button id="m-settings"><span>⚙️</span>Настройки<i>›</i></button>
       <button id="m-feedback"><span>💬</span>Написать @e3to_ya<i>›</i></button>
     </div>
-    <div class="version">CriptoForex (v119)</div>
+    <div class="version">CriptoForex (v121)</div>
   </section>
 
   <nav class="nav">
@@ -192,8 +192,15 @@
         <button class="dom-fc-x" id="dom-fc-x" aria-label="Закрыть график">✕</button>
       </div>
       <canvas id="dom-fc-cv"></canvas>
-      <div class="dom-fc-rz" id="dom-fc-rz" title="Тяни вниз/вверх — высота; двойной тап — по умолчанию"></div>
-      <div class="dom-fc-rc" id="dom-fc-rc" title="Тяни — ширина и высота"></div>
+      <!-- ручки изменения размера: 4 стороны + 4 угла (двойной тап — размер по умолчанию) -->
+      <div class="dom-fc-h n" data-rz="n" title="Тяни — высота сверху; двойной тап — по умолчанию"></div>
+      <div class="dom-fc-h s" data-rz="s" title="Тяни — высота снизу; двойной тап — по умолчанию"></div>
+      <div class="dom-fc-h w" data-rz="w" title="Тяни — ширина слева; двойной тап — по умолчанию"></div>
+      <div class="dom-fc-h e" data-rz="e" title="Тяни — ширина справа; двойной тап — по умолчанию"></div>
+      <div class="dom-fc-h nw" data-rz="nw" title="Тяни — ширина и высота"></div>
+      <div class="dom-fc-h ne" data-rz="ne" title="Тяни — ширина и высота"></div>
+      <div class="dom-fc-h sw" data-rz="sw" title="Тяни — ширина и высота"></div>
+      <div class="dom-fc-h se" data-rz="se" title="Тяни — ширина и высота"></div>
     </div>
     <div class="dom-plate" id="dom-plate"></div>
   </div>
@@ -217,8 +224,8 @@
 <script src="./currencies.js"></script>
 <script src="./icons.js?v=11"></script>
 <script src="./demo.js?v=117"></script>
-<script src="./app.js?v=119-pwa"></script>
-<script src="./dom.js?v=119"></script>
+<script src="./app.js?v=121-pwa"></script>
+<script src="./dom.js?v=121"></script>
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
