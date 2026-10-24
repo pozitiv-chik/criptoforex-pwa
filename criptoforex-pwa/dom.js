@@ -64,6 +64,7 @@ function domInit() {
   $("dom-tpsl-set").onclick = () => openTpslPre();
   domScrollZoomInit(lad);
   domChartInit(lad);
+  domFcInit();
   $("dom-orders").addEventListener("click", (e) => {
     const c = e.target.closest("[data-oc]"), all = e.target.closest("[data-oall]");
     if (c) domCancel({ id: Number(c.dataset.oc) }); else if (all) domCancel({ all: true, asset: DOM.asset });
@@ -89,6 +90,7 @@ function openDom() {
   if (!a || a.cat !== "crypto") return;
   Object.assign(DOM, { open: true, asset: a.id, ex: S.ex || null, book: null, err: "", sel: null, synced: false, prev: null, centered: false, candles: [], cKey: "", cAt: 0, pan: 0, mapMid: null, tKey: "", trSeen: new Map(), trFirst: true });
   showAnimated($("dom-view")); domZoomSet(); domTpslSync(); domChartTimer();
+  FC.candles = []; FC.key = ""; if (domFcInit.load) domFcInit.load();
   if (tg && tg.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(closeDom); }
   domRender(); domLoad();
   clearInterval(DOM.timer); DOM.timer = setInterval(() => domLoad(), 300);
@@ -98,6 +100,7 @@ function domRetarget() {
   const a = assetById(S.asset);
   if (!DOM.open || !a || a.cat !== "crypto") return;
   Object.assign(DOM, { asset: a.id, ex: S.ex || null, book: null, err: "", sel: null, synced: false, prev: null, centered: false, candles: [], cKey: "", cAt: 0, pan: 0, mapMid: null, tKey: "", trSeen: new Map(), trFirst: true });
+  FC.candles = []; FC.key = "";
   domRender(); domLoad();
 }
 function closeDom() {
@@ -120,7 +123,7 @@ async function domLoad(force) {
     if (DOM.ex !== d.ex) DOM.ex = d.ex;                                          // сервер подобрал биржу со стаканом
     if (!DOM.synced) { DOM.synced = true; if ((S.ex || null) !== d.ex) pickExchange(d.ex); }   // график и сделки — на той же бирже, что стакан
     if (d.asks.length && d.bids.length) { DOM.path.push([Date.now(), (d.asks[0][0] + d.bids[0][0]) / 2]); if (DOM.path.length > 1500) DOM.path.splice(0, 300); }
-    domChartLive(d.price); domCandles(); if (Date.now() - (DOM.trAt || 0) > 700) { DOM.trAt = Date.now(); domTrades(); }
+    domChartLive(d.price); domFcLive(d.price); domFcLoad(); domFcDraw(); domCandles(); if (Date.now() - (DOM.trAt || 0) > 700) { DOM.trAt = Date.now(); domTrades(); }
     domRender();
   } catch (e) {
     DOM.err = e.message; domRender();
@@ -622,4 +625,126 @@ function domChartDraw() {
   if (!DOM.tOk && !DOM.candlesOn) { ctx.fillStyle = muted; ctx.font = "13px system-ui,sans-serif"; ctx.fillText("У этой биржи нет ленты сделок — включи «Свечи»", 14, 64); }
   const tf = $("dom-tfs"); tf.querySelectorAll("[data-tf]").forEach((x) => x.classList.toggle("on", DOM.candlesOn && x.dataset.tf === DOM.tf));
   tf.querySelector("[data-cd]").classList.toggle("on", DOM.candlesOn);
+}
+
+// ---------------------------------------------------------------- плавающий график поверх стакана
+// Кнопка 📈 в панели слева внизу. Окно двигается за заголовок, высота — за нижнюю границу, ширина и высота — за правый нижний угол.
+// Положение и размер запоминаются (отдельно для горизонтали и вертикали). Данные: свечи биржи + живая цена стакана.
+const FC = { on: false, x: 0, y: 0, w: 0, h: 0, tf: "1", candles: [], key: "", at: 0, busy: false };
+function domFcInit() {
+  const box = $("dom-fc"), lw = document.querySelector(".dom-lw"), head = $("dom-fc-head");
+  const land = () => window.matchMedia("(min-width:640px) and (orientation:landscape)").matches;
+  const kk = () => "domFc" + (land() ? "" : "P");
+  const bounds = () => ({ W: lw.clientWidth, H: Math.max(120, lw.clientHeight - 44) });         // снизу — плашка с ценой
+  const clamp = () => {
+    const { W, H } = bounds();
+    FC.w = FC.w ? Math.max(160, Math.min(W, FC.w)) : 0; FC.h = FC.h ? Math.max(90, Math.min(H, FC.h)) : 0;
+    const w = FC.w || W, h = FC.h || Math.min(190, Math.round(H * 0.4));
+    FC.x = Math.max(0, Math.min(W - w, FC.x)); FC.y = Math.max(0, Math.min(H - Math.min(h, H), FC.y));
+  };
+  const apply = () => {
+    clamp(); const s = box.style;
+    s.setProperty("--fc-x", FC.x + "px"); s.setProperty("--fc-y", FC.y + "px");
+    FC.w ? s.setProperty("--fc-w", FC.w + "px") : s.removeProperty("--fc-w");
+    FC.h ? s.setProperty("--fc-h", FC.h + "px") : s.removeProperty("--fc-h");
+    domFcDraw();
+  };
+  const save = () => domLs(kk(), JSON.stringify({ on: FC.on, x: FC.x, y: FC.y, w: FC.w, h: FC.h, tf: FC.tf }));
+  const load = () => {
+    let o = null; try { o = JSON.parse(domLs(kk()) || "null"); } catch (e) {}
+    Object.assign(FC, { x: 0, y: 0, w: 0, h: 0 }, o && typeof o === "object" ? { on: !!o.on, x: +o.x || 0, y: +o.y || 0, w: +o.w || 0, h: +o.h || 0, tf: DOM_TF_SEC[o.tf] ? o.tf : "1" } : {});
+    box.hidden = !FC.on; $("dom-fc-btn").classList.toggle("on", FC.on); domFcTfSync(); if (FC.on) requestAnimationFrame(apply);
+  };
+  domFcInit.load = load; domFcInit.apply = apply;
+  const toggle = (on) => {
+    FC.on = on; box.hidden = !on; $("dom-fc-btn").classList.toggle("on", on); save();
+    if (on) { FC.key = ""; requestAnimationFrame(apply); domFcLoad(true); }
+  };
+  $("dom-fc-btn").onclick = () => toggle(!FC.on);
+  $("dom-fc-x").onclick = () => toggle(false);
+  $("dom-fc-tfs").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-ftf]"); if (!b) return;
+    FC.tf = b.dataset.ftf; FC.candles = []; FC.key = ""; domFcTfSync(); save(); domFcLoad(true);
+  });
+  // универсальное перетаскивание: двойной тап — сброс
+  const grab = (el, onMove, onReset) => {
+    let lastTap = 0;
+    el.addEventListener("pointerdown", (e) => {
+      if (e.target.closest && e.target.closest("button")) return;
+      e.preventDefault();
+      const x0 = e.clientX, y0 = e.clientY, s0 = { x: FC.x, y: FC.y, w: FC.w || bounds().W, h: FC.h || box.getBoundingClientRect().height };
+      let moved = false;
+      try { el.setPointerCapture(e.pointerId); } catch (x) {}
+      box.classList.add("drag");
+      const mv = (m) => { const dx = m.clientX - x0, dy = m.clientY - y0; if (Math.abs(dx) + Math.abs(dy) > 4) moved = true; onMove(dx, dy, s0); apply(); };
+      const up = () => {
+        el.removeEventListener("pointermove", mv); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up);
+        box.classList.remove("drag");
+        if (!moved) { const n = Date.now(); if (n - lastTap < 350) { lastTap = 0; onReset(); apply(); } else lastTap = n; }
+        save();
+      };
+      el.addEventListener("pointermove", mv); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+    });
+  };
+  grab(head, (dx, dy, s0) => { FC.x = s0.x + dx; FC.y = s0.y + dy; }, () => { FC.x = 0; FC.y = 0; });
+  grab($("dom-fc-rz"), (dx, dy, s0) => { FC.h = s0.h + dy; if (!FC.w) FC.w = 0; }, () => { FC.h = 0; });
+  grab($("dom-fc-rc"), (dx, dy, s0) => { FC.w = s0.w + dx; FC.h = s0.h + dy; }, () => { FC.w = 0; FC.h = 0; });
+  window.addEventListener("resize", () => { if (FC.on && DOM.open) requestAnimationFrame(apply); });
+  const mq = window.matchMedia("(min-width:640px) and (orientation:landscape)");
+  (mq.addEventListener ? mq.addEventListener("change", load) : mq.addListener(load));
+  load();
+}
+function domFcTfSync() { document.querySelectorAll("#dom-fc-tfs [data-ftf]").forEach((b) => b.classList.toggle("on", b.dataset.ftf === FC.tf)); }
+async function domFcLoad(force) {
+  if (!FC.on || !DOM.open || FC.busy || document.hidden) return;
+  const key = DOM.asset + "|" + FC.tf + "|" + (DOM.ex || "");
+  if (!force && key === FC.key && Date.now() - FC.at < 5000) return;
+  FC.busy = true;
+  try {
+    const { candles } = await api(`/api/candles?asset=${DOM.asset}&tf=${FC.tf}` + (DOM.ex ? "&ex=" + DOM.ex : ""));
+    if (FC.on && DOM.open && key === DOM.asset + "|" + FC.tf + "|" + (DOM.ex || "")) { FC.candles = candles.slice(-300); FC.key = key; FC.at = Date.now(); domFcDraw(); }
+  } catch (e) { FC.at = Date.now(); }
+  finally { FC.busy = false; }
+}
+// последняя свеча живёт на цене стакана
+function domFcLive(px) {
+  const cs = FC.candles, last = cs[cs.length - 1]; if (!last || px == null) return;
+  const sec = DOM_TF_SEC[FC.tf] || 60, now = Math.floor(Date.now() / 1000);
+  if (now >= last.time + sec) cs.push({ time: last.time + Math.floor((now - last.time) / sec) * sec, open: last.close, high: Math.max(last.close, px), low: Math.min(last.close, px), close: px });
+  else { last.high = Math.max(last.high, px); last.low = Math.min(last.low, px); last.close = px; }
+}
+function domFcDraw() {
+  const box = $("dom-fc"), cv = $("dom-fc-cv"); if (!FC.on || !DOM.open || box.hidden || !cv.clientWidth) return;
+  const W = cv.clientWidth, H = cv.clientHeight, dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const a = domAsset(); $("dom-fc-title").textContent = a ? a.name : "График";
+  const cs = FC.candles; if (cs.length < 2) { ctx.fillStyle = "#8b9099"; ctx.font = "12px sans-serif"; ctx.textAlign = "center"; ctx.fillText("Загрузка графика…", W / 2, H / 2); return; }
+  const st = getComputedStyle(document.documentElement), col = (n, f) => (st.getPropertyValue(n) || f).trim() || f;
+  const line = col("--line", "#2e3239"), muted = col("--muted", "#888"), text = col("--text", "#fff"), bg = col("--bg", "#16181d");
+  const dec = a ? a.decimals : 2, padR = 62, padB = 6, padT = 6, cw = W - padR, ch = H - padT - padB;
+  const step = Math.max(2, cw / Math.min(cs.length, Math.max(20, Math.floor(cw / 4))));     // ~4px на свечу; ширину окна заполняем последними свечами
+  const n = Math.min(cs.length, Math.floor(cw / step)), vis = cs.slice(-n);
+  let lo = Infinity, hi = -Infinity; vis.forEach((c) => { lo = Math.min(lo, c.low != null ? c.low : c.close); hi = Math.max(hi, c.high != null ? c.high : c.close); });
+  if (!(hi > lo)) { hi = lo * 1.0005; lo = lo * 0.9995; }
+  const m = (hi - lo) * 0.08; lo -= m; hi += m;
+  const Y = (p) => padT + (hi - p) / (hi - lo) * ch, X = (i) => cw - (n - 1 - i) * step - 2;
+  ctx.lineWidth = 1; ctx.strokeStyle = line; ctx.globalAlpha = 0.6; ctx.fillStyle = muted; ctx.font = "10px sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  ctx.beginPath(); for (let g = 0; g <= 4; g++) { const y = Math.round(padT + ch * g / 4) + 0.5; ctx.moveTo(0, y); ctx.lineTo(cw, y); } ctx.stroke(); ctx.globalAlpha = 1;
+  for (let g = 0; g <= 4; g++) ctx.fillText((hi - (hi - lo) * g / 4).toFixed(dec), cw + 4, Math.min(H - 6, Math.max(7, padT + ch * g / 4)));
+  const up = vis[vis.length - 1].close >= vis[0].close, c1 = up ? COLOR_UP : COLOR_DOWN;
+  // заливка под линией и сама линия цены закрытия
+  ctx.beginPath(); vis.forEach((c, i) => (i ? ctx.lineTo(X(i), Y(c.close)) : ctx.moveTo(X(i), Y(c.close))));
+  ctx.strokeStyle = c1; ctx.lineWidth = 1.8; ctx.lineJoin = "round"; ctx.stroke();
+  ctx.lineTo(X(n - 1), padT + ch); ctx.lineTo(X(0), padT + ch); ctx.closePath(); ctx.globalAlpha = 0.14; ctx.fillStyle = c1; ctx.fill(); ctx.globalAlpha = 1;
+  // текущая цена: пунктир + плашка справа
+  const last = vis[vis.length - 1].close, yl = Math.round(Y(last)) + 0.5;
+  ctx.setLineDash([4, 3]); ctx.strokeStyle = text; ctx.globalAlpha = 0.7; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, yl); ctx.lineTo(cw, yl); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+  const label = last.toFixed(dec); ctx.font = "bold 11px sans-serif"; const tw = ctx.measureText(label).width + 8;
+  ctx.fillStyle = text; ctx.fillRect(cw + 1, yl - 8, Math.min(tw, padR - 1), 16); ctx.fillStyle = bg; ctx.textAlign = "left"; ctx.fillText(label, cw + 5, yl);
+  // открытые позиции по этому активу: линия входа
+  (S.trades || []).filter((t) => t.asset === DOM.asset && t.entry_price >= lo && t.entry_price <= hi).forEach((t) => {
+    const y = Math.round(Y(t.entry_price)) + 0.5; ctx.setLineDash([2, 3]); ctx.strokeStyle = t.direction === "up" ? COLOR_UP : COLOR_DOWN; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke(); ctx.setLineDash([]);
+  });
 }

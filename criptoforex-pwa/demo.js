@@ -24,37 +24,98 @@
       nextTradeId: 1, nextOrderId: 1, nextAlertId: 1 };
   }
 
-  function loadState() {
+  function normalizeState(saved) {
     const base = defaultState();
+    if (!saved || typeof saved !== "object" || saved.version !== 1) return null;
+    return { ...base, ...saved, balance: finite(saved.balance) ? saved.balance : START_BALANCE,
+      ui: saved.ui && typeof saved.ui === "object" ? saved.ui : {},
+      trades: Array.isArray(saved.trades) ? saved.trades : [],
+      orders: Array.isArray(saved.orders) ? saved.orders : [],
+      alerts: Array.isArray(saved.alerts) ? saved.alerts : [],
+      customAssets: Array.isArray(saved.customAssets) ? saved.customAssets : [] };
+  }
+
+  // ---- второе хранилище: IndexedDB (дублирует localStorage; переживает его очистку/сбой и надёжнее на iOS/Android)
+  const IDB_NAME = "criptoforex-local", IDB_STORE = "kv";
+  function idbOpen() {
+    return new Promise((resolve, reject) => {
+      if (!global.indexedDB) return reject(new Error("no indexedDB"));
+      const req = global.indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains(IDB_STORE)) req.result.createObjectStore(IDB_STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbGet() {
     try {
-      const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
-      if (!saved || saved.version !== 1) return base;
-      return { ...base, ...saved, balance: finite(saved.balance) ? saved.balance : START_BALANCE,
-        ui: saved.ui && typeof saved.ui === "object" ? saved.ui : {},
-        trades: Array.isArray(saved.trades) ? saved.trades : [],
-        orders: Array.isArray(saved.orders) ? saved.orders : [],
-        alerts: Array.isArray(saved.alerts) ? saved.alerts : [],
-        customAssets: Array.isArray(saved.customAssets) ? saved.customAssets : [] };
-    } catch (error) { return base; }
+      const db = await idbOpen();
+      return await new Promise((resolve) => {
+        const req = db.transaction(IDB_STORE, "readonly").objectStore(IDB_STORE).get(STORE_KEY);
+        req.onsuccess = () => { db.close(); resolve(req.result || null); };
+        req.onerror = () => { db.close(); resolve(null); };
+      });
+    } catch (error) { return null; }
+  }
+  let idbQueue = Promise.resolve();
+  function idbPut(json) {
+    idbQueue = idbQueue.then(async () => {
+      try {
+        const db = await idbOpen();
+        await new Promise((resolve) => {
+          const tx = db.transaction(IDB_STORE, "readwrite");
+          tx.objectStore(IDB_STORE).put(json, STORE_KEY);
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onerror = tx.onabort = () => { db.close(); resolve(); };
+        });
+      } catch (error) { /* IndexedDB недоступен — остаётся localStorage */ }
+    });
+    return idbQueue;
+  }
+
+  // читаем оба хранилища и берём более свежую копию (по savedAt)
+  async function loadState() {
+    let fromLs = null, fromIdb = null;
+    try { fromLs = normalizeState(JSON.parse(localStorage.getItem(STORE_KEY) || "null")); } catch (error) { fromLs = null; }
+    try { const raw = await idbGet(); fromIdb = raw ? normalizeState(JSON.parse(raw)) : null; } catch (error) { fromIdb = null; }
+    const best = fromLs && fromIdb ? ((fromIdb.savedAt || 0) > (fromLs.savedAt || 0) ? fromIdb : fromLs) : (fromLs || fromIdb);
+    return best || defaultState();
   }
 
   function saveState() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); return true; }
-    catch (error) { console.warn("Local demo data could not be saved", error); return false; }
+    if (!state) return false;
+    state.savedAt = Date.now();
+    let json, ok = false;
+    try { json = JSON.stringify(state); } catch (error) { return false; }
+    try { localStorage.setItem(STORE_KEY, json); ok = true; }
+    catch (error) { console.warn("Local demo data could not be saved to localStorage", error); }
+    idbPut(json);                                   // дубль в IndexedDB (асинхронно)
+    return ok;
   }
 
-  async function ready() {
-    if (!catalog) {
-      const response = await fetch("demo-catalog.json", { cache: "no-cache" });
-      if (!response.ok) throw new Error("Не удалось загрузить список активов");
-      catalog = await response.json();
-      state = loadState();
-      state.trades.forEach((trade) => { state.nextTradeId = Math.max(state.nextTradeId, Number(trade.id) + 1 || 1); });
-      state.orders.forEach((order) => { state.nextOrderId = Math.max(state.nextOrderId, Number(order.id) + 1 || 1); });
-      state.alerts.forEach((alert) => { state.nextAlertId = Math.max(state.nextAlertId, Number(alert.id) + 1 || 1); });
+  let readyPromise = null;
+  function ready() {
+    if (!readyPromise) {
+      readyPromise = (async () => {
+        const response = await fetch("demo-catalog.json", { cache: "no-cache" });
+        if (!response.ok) throw new Error("Не удалось загрузить список активов");
+        const loaded = await response.json();
+        const st = await loadState();
+        st.trades.forEach((trade) => { st.nextTradeId = Math.max(st.nextTradeId, Number(trade.id) + 1 || 1); });
+        st.orders.forEach((order) => { st.nextOrderId = Math.max(st.nextOrderId, Number(order.id) + 1 || 1); });
+        st.alerts.forEach((alert) => { st.nextAlertId = Math.max(st.nextAlertId, Number(alert.id) + 1 || 1); });
+        catalog = loaded; state = st;
+        saveState();                                // синхронизируем оба хранилища
+        // просим браузер не выселять данные приложения при нехватке места
+        try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (error) {}
+        return catalog;
+      })().catch((error) => { readyPromise = null; throw error; });   // при ошибке загрузки можно повторить
     }
-    return catalog;
+    return readyPromise;
   }
+
+  // при сворачивании/закрытии — ещё раз сбрасываем состояние на диск (открытые сделки, баланс)
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveState(); });
+  global.addEventListener("pagehide", () => saveState());
 
   function allAssets() {
     const merged = new Map((catalog.assets || []).map((asset) => [asset.id, asset]));

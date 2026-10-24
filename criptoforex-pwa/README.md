@@ -4,7 +4,7 @@ This folder contains the web files extracted from the v113 APK, adapted for iPho
 
 ## What works
 
-- The app runs in local demo mode. Balance, trades, alerts, and preferences are stored in this browser and are not synced to an account.
+- The app runs in local demo mode. Balance, trades, alerts, and preferences are stored in this browser (localStorage, mirrored to IndexedDB, flushed on hide/close) and are not synced to an account.
 - It tries public market-data APIs while online. If a source is blocked or unavailable, it shows simulated training prices.
 - The app shell, demo catalog, charts library, and icons are cached for offline launch after the first successful visit.
 - TradingView widgets and live market data need an internet connection.
@@ -24,3 +24,13 @@ This folder contains the web files extracted from the v113 APK, adapted for iPho
 3. Keep **Open as Web App** enabled if iOS shows that option, then tap **Add**.
 
 The app needs to be opened once while online so Safari can install the service worker and cache the offline files.
+
+## v117
+
+- Status bar follows the app theme (dynamic `theme-color`, `black-translucent` on iOS). Reinstall the Home Screen icon once so iOS picks up the new status-bar style.
+- Analytics screen uses the app theme colors; TradingView widgets are transparent and re-mounted on theme change.
+- State persistence: localStorage + IndexedDB mirror, `navigator.storage.persist()`, save on `visibilitychange`/`pagehide`.
+
+## v118
+
+- DOM screen: 📈 button (bottom-left panel) adds a floating price chart over the order book. Drag the header to move, drag the bottom edge to change height, drag the bottom-right corner to resize; double-tap resets. Position/size/timeframe are remembered.

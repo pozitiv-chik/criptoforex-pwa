@@ -369,11 +369,19 @@ function applyTheme(id, redraw) {
   FX_RGB = th.fx ? th.fx[0] : "150,205,255";
   if (LW.series) { try { LW.series.applyOptions({ upColor: up, downColor: down, wickUpColor: up, wickDownColor: down }); LW.markerKey = ""; } catch (e) {} }
   try { localStorage.setItem("theme", id); } catch (e) {}
+  // статус-бар / системная панель: красим под фон темы (Chrome/Android, Safari, Telegram)
+  try {
+    const mt = document.getElementById("meta-theme"), ms = document.getElementById("meta-scheme");
+    if (mt) mt.setAttribute("content", v.bg);
+    if (ms) ms.setAttribute("content", th.dark ? "dark" : "light");
+    document.documentElement.style.backgroundColor = v.bg;
+  } catch (e) {}
   if (tg) { try { tg.setHeaderColor(v.bg); tg.setBackgroundColor(v.bg); } catch (e) {} }
   if (redraw) {
     if (LW.chart) { try { LW.chart.applyOptions(lwTheme()); } catch (e) {} }
     if (S.chartMode === "tv") renderTV(true);
     LW.lvKey = "";
+    try { if (S.assets && S.assets.length) renderAnalytics(true); } catch (e) {}   // виджеты аналитики — под новую тему
   }
 }
 
@@ -2085,13 +2093,15 @@ function showPage(name) {
 let anKey = "";
 function renderAnalytics(force) {
   const a = assetById(S.asset); $("an-asset").textContent = "Технический анализ · " + a.name;
-  if (!force && anKey === a.tv) return;        // виджеты уже загружены для этого актива — открываем мгновенно
-  anKey = a.tv;
+  const dark = S.chartTheme !== "light", key = a.tv + "|" + (dark ? "d" : "l") + "|" + (S.themeBg || "");
+  if (!force && anKey === key) return;         // виджеты уже загружены для этого актива и темы — открываем мгновенно
+  anKey = key;
+  // isTransparent: виджет прозрачный и показывает фон приложения (var(--bg)), а не собственный серый/белый
   mountTV($("tv-technical"), "embed-widget-technical-analysis.js", {
-    interval: "5m", width: "100%", height: "100%", isTransparent: false, backgroundColor: "#16181d", symbol: a.tv, showIntervalTabs: true,
-    displayMode: "single", locale: "ru", colorTheme: "dark" });
+    interval: "5m", width: "100%", height: "100%", isTransparent: true, symbol: a.tv, showIntervalTabs: true,
+    displayMode: "single", locale: "ru", colorTheme: dark ? "dark" : "light" });
   mountTV($("tv-events"), "embed-widget-events.js", {
-    colorTheme: "dark", isTransparent: false, backgroundColor: "#16181d", width: "100%", height: "100%", locale: "ru",
+    colorTheme: dark ? "dark" : "light", isTransparent: true, width: "100%", height: "100%", locale: "ru",
     importanceFilter: "-1,0,1", countryFilter: "us,eu,gb,jp,ru" });
 }
 
